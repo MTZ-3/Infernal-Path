@@ -4,12 +4,6 @@ import { t } from '../../i18n.js';
 import { CARD_DEFS, allCardIds, shuffle, scaledValue } from '../cards/cards.js';
 
 
-export function canStartRun() {
-  return state.selection.length === state.selectionTarget;
-}
-
-
-
 export const state = {
 mode: 'select', // 'select' | 'run'
 day: 1,
@@ -63,4 +57,55 @@ export function toggleSelectCard(id){
 const i = state.selection.indexOf(id);
 if (i >= 0) state.selection.splice(i,1);
 else if (state.selection.length < state.selectionTarget) state.selection.push(id);
+}
+
+
+export function canStartRun(){
+return state.selection.length === state.selectionTarget;
+}
+
+
+export function newRunFromSelection(){
+// Grundwerte resetten
+state.mode = 'run';
+state.day = 1;
+state.powerLevel = 1; // Start-Level (kannst du anders mappen)
+state.energy = state.maxEnergy;
+state.souls = 0;
+state.map = buildMap();
+state.hero = createHero();
+state.heroPos = 0;
+state.shop.open = true;
+state.runes = {};
+state.effects = { bleed: 0, weak: 0 };
+
+
+// Deck initialisieren aus Auswahl (eine Kopie pro Karte)
+state.drawPile = shuffle(state.selection.slice());
+state.hand = [];
+state.discard = [];
+
+
+// Start-Hand
+drawCards(5);
+}
+
+
+export function tryAttack(){
+if (state.energy <= 0) return;
+state.energy -= 1;
+const bonus = (state.runes.rune_damage || 0);
+const dmg = 2 + bonus - (state.effects.weak>0?1:0);
+applyDamage(dmg);
+}
+
+
+function applyDamage(n){
+const real = Math.max(0, n - (state.effects.weak>0?1:0));
+state.hero.hp -= real;
+if (state.hero.hp <= 0) killHero();
+}
+
+
+export function drawCards(n=1){
 }
