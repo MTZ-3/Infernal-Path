@@ -2,8 +2,8 @@ import { initI18n } from './i18n.js';
 import { loadCardDefs } from './game/cards/cards.js';
 import { render } from './ui/render.js';
 import {
-state, initPools, enterSelection, toggleSelectCard, canStartRun, newRunFromSelection,
-tryAttack, nextDay, playCard, chooseDraftCard
+  state, initPools, enterSelection, toggleSelectCard, canStartRun, newRunFromSelection,
+  tryAttack, nextDay, playCard, openDailyDraft, chooseDraftCard
 } from './game/core/gameState.js';
 
 

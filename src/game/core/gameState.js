@@ -4,6 +4,12 @@ import { t } from '../../i18n.js';
 import { CARD_DEFS, allCardIds, shuffle, scaledValue } from '../cards/cards.js';
 
 
+export function canStartRun() {
+  return state.selection.length === state.selectionTarget;
+}
+
+
+
 export const state = {
 mode: 'select', // 'select' | 'run'
 day: 1,
