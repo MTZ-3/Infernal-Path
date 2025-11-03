@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Infernal Path (Prototype)</title>
+<style>
+:root { --bg:#0f0f12; --card:#16161b; --ink:#ececf1; --muted:#9aa0a6; --accent:#8b5cf6; }
+* { box-sizing: border-box; }
+body { margin:0; font:14px/1.4 system-ui,Segoe UI,Roboto; background:var(--bg); color:var(--ink); }
+header { padding:16px 20px; border-bottom:1px solid #2a2a35; position:sticky; top:0; background:rgba(15,15,18,.9); backdrop-filter:saturate(140%) blur(6px); }
+h1 { margin:0; font-size:18px; letter-spacing:.2px; }
+main { display:grid; grid-template-columns: 320px 1fr; gap:16px; padding:16px; }
+.card { background:var(--card); border:1px solid #2a2a35; border-radius:16px; padding:14px; }
+.row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+button { background:#23232b; color:var(--ink); border:1px solid #333346; padding:8px 10px; border-radius:12px; cursor:pointer; }
+button.primary { background:var(--accent); border-color:#6d28d9; color:white; }
+button:disabled { opacity:.6; cursor:not-allowed; }
+.pill { padding:4px 8px; border-radius:999px; font-size:12px; border:1px solid #2c2c3a; color:var(--muted); }
+.list { display:flex; flex-direction:column; gap:8px; }
+.tile { display:flex; justify-content:space-between; align-items:center; padding:8px; border:1px dashed #2e2e3a; border-radius:12px; }
+.muted { color:var(--muted); }
+.grid { display:grid; gap:12px; }
+.shop { display:grid; gap:8px; }
+</style>
+</head>
+<body>
+<header>
+<h1>🕯️ Infernal Path – Prototyp (DE)</h1>
+</header>
+<main>
+<section class="card grid" id="left"></section>
+<section class="card grid" id="right"></section>
+</main>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

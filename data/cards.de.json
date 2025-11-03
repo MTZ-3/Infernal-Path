@@ -1,0 +1,5 @@
+[
+{ "id":"daemon_schattenbestie", "name":"Schattenbestie", "type":"daemon", "cost":2, "desc":"Beschwöre eine Schattenbestie (WIP)." },
+{ "id":"fluch_schwaechung", "name":"Schwächung", "type":"fluch", "cost":1, "desc":"-1 Angriff des Helden (WIP)." },
+{ "id":"ritual_opferung", "name":"Opferung", "type":"ritual", "cost":0, "desc":"Erhalte 1 Energie, wenn ein Dämon stirbt (WIP)." }
+]

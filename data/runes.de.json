@@ -1,0 +1,5 @@
+[
+{ "key":"rune_draw", "name":"Rune der Gier", "cost":12, "desc":"Ziehe pro Runde 1 Karte mehr." },
+{ "key":"rune_damage", "name":"Rune der Finsternis", "cost":15, "desc":"+1 Schaden für Dämonen-Angriffe." },
+{ "key":"rune_energy", "name":"Rune der Opferung", "cost":10, "desc":"+1 maximale Energie." }
+]

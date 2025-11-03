@@ -1,0 +1,14 @@
+{
+"day":"Tag",
+"energy":"Energie",
+"souls":"Seelenfragmente",
+"hero":"Held",
+"spec":"Fähigkeit",
+"btn.attack":"Held angreifen (-1 Energie)",
+"btn.nextDay":"Nächster Tag",
+"shop.title":"Runen-Shop (immer offen)",
+"cost":"Kosten",
+"buy":"Kaufen",
+"game.over":"Game Over – Der Held hat deinen Altar erreicht.",
+"hero.slain":"Held getötet! Beute: {{souls}} Seelenfragmente"
+}

@@ -1,0 +1,7 @@
+[
+{ "class":"ritter", "minHp":14, "maxHp":18 },
+{ "class":"jaeger", "minHp":12, "maxHp":16 },
+{ "class":"assassine", "minHp":10, "maxHp":14 },
+{ "class":"magier", "minHp":9, "maxHp":12 },
+{ "class":"priester","minHp":10, "maxHp":13 }
+]
