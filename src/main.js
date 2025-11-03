@@ -3,7 +3,7 @@ import { loadCardDefs } from './game/cards/cards.js';
 import { render } from './ui/render.js';
 import {
 state, initPools, enterSelection, toggleSelectCard, canStartRun, newRunFromSelection,
-tryAttack, nextDay, playCard, openDailyDraft, chooseDraftCard
+tryAttack, nextDay, playCard, chooseDraftCard
 } from './game/core/gameState.js';
 
 

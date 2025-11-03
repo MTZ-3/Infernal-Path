@@ -2,9 +2,17 @@ export let CARD_DEFS = {};
 
 
 export async function loadCardDefs(){
-const res = await fetch('./data/cards.de.json');
-const arr = await res.json();
-CARD_DEFS = Object.fromEntries(arr.map(c => [c.id, c]));
+  try {
+    const res = await fetch('data/cards.de.json'); // relativ zur Seite
+    if (!res.ok) throw new Error(`cards.de.json HTTP ${res.status}`);
+    const arr = await res.json();
+    CARD_DEFS = Object.fromEntries(arr.map(c => [c.id, c]));
+    console.log('[cards] loaded', Object.keys(CARD_DEFS).length);
+  } catch (e) {
+    console.error('[cards] load error:', e);
+    // kleine Notfallanzeige, damit du was siehst
+    CARD_DEFS = {};
+  }
 }
 
 
