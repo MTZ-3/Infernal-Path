@@ -1,23 +1,39 @@
-// src/main.js
-import { newRun, nextDay, tryAttack, state, killHero, buyRune } from './game/core/gameState.js';
-import { render } from './ui/render.js';
 import { initI18n } from './i18n.js';
+import { loadCardDefs } from './game/cards/cards.js';
+import { render } from './ui/render.js';
+import {
+state, initPools, enterSelection, toggleSelectCard, canStartRun, newRunFromSelection,
+tryAttack, nextDay, playCard, openDailyDraft, chooseDraftCard
+} from './game/core/gameState.js';
+
 
 // Bootstrap
-await initI18n();   // <— wichtig: erst Texte laden
-newRun();
+await initI18n();
+await loadCardDefs();
+initPools();
+enterSelection();
 render();
 
-// Debug-Helpers
-window.InfernalPath = { state, nextDay, tryAttack, killHero, buyRune };
 
-// Click-Events
+// Debug
+window.InfernalPath = { state, enterSelection, newRunFromSelection, nextDay, tryAttack, playCard };
+
+
+// Events
 window.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action]');
-  if (!el) return;
-  const a = el.dataset.action;
-  if (a === 'next-day') nextDay();
-  if (a === 'attack') tryAttack();
-  if (a === 'buy-rune') buyRune(el.dataset.key);
-  render();
+const el = e.target.closest('[data-action]');
+if (!el) return;
+const a = el.dataset.action;
+
+
+if (a === 'toggle-select') { toggleSelectCard(el.dataset.id); render(); }
+if (a === 'start-run') { if (canStartRun()) { newRunFromSelection(); render(); } }
+
+
+if (a === 'next-day') { nextDay(); render(); }
+if (a === 'attack') { tryAttack(); render(); }
+if (a === 'play-card') { playCard(el.dataset.id); render(); }
+
+
+if (a === 'pick-draft') { chooseDraftCard(el.dataset.id); render(); }
 });
