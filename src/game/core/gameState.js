@@ -106,6 +106,28 @@ state.hero.hp -= real;
 if (state.hero.hp <= 0) killHero();
 }
 
+// Tages-Draft öffnen (z. B. am Tagesbeginn)
+export function openDailyDraft(n = 3) {
+  if (state.mode !== 'run') return;
+  const ids = shuffle(state.cardPool.slice());
+  state.draftOptions = ids.slice(0, n);   // 3 Vorschläge
+  state.draftOpen = true;
+}
+
+// Eine der 3 Draft-Karten wählen
+export function chooseDraftCard(id) {
+  if (!state.draftOpen) return;
+  if (!state.draftOptions.includes(id)) return;
+
+  // Gewählte Karte ins Deck (Ablage -> wird gemischt wenn drawPile leer)
+  state.discard.push(id);
+
+  // Draft schließen
+  state.draftOpen = false;
+  state.draftOptions = [];
+}
+
+
 
 export function drawCards(n=1){
 }
