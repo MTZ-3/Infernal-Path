@@ -3,7 +3,7 @@ import { loadCardDefs } from './game/cards/cards.js';
 import { render } from './ui/render.js';
 import {
   state, initPools, enterSelection, toggleSelectCard, canStartRun, newRunFromSelection,
-  tryAttack, nextDay, playCard, openDailyDraft, chooseDraftCard
+  tryAttack, nextDay, playCard, openDailyDraft, chooseDraftCard, placeCardOnTile, cancelPlaceIntent 
 } from './game/core/gameState.js';
 
 
@@ -33,6 +33,6 @@ window.addEventListener('click', (e) => {
   if (a === 'pick-draft') { chooseDraftCard(el.dataset.id); render(); }
 
   // Platzieren
-  if (a === 'place-here') { placeCardOnTile(parseInt(el.dataset.idx,10)); render(); }
+  if (a === 'place-here') { placeCardOnTile(parseInt(el.dataset.idx, 10)); render(); }
   if (a === 'cancel-place') { cancelPlaceIntent(); render(); }
 });
