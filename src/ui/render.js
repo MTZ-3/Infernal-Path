@@ -3,26 +3,23 @@ import { state } from '../game/core/gameState.js';
 import { CARD_DEFS, scaledValue } from '../game/cards/cards.js';
 
 export function render(){
-  const L = document.getElementById('left');
-  const R = document.getElementById('right');
+  const leftEl = document.getElementById('left');
+  const rightEl = document.getElementById('right');
+  const overlayEl = document.getElementById('overlay'); // <-- EINMAL holen, überall benutzen
+
+  if (!leftEl || !rightEl) return;
 
   if (state.mode === 'select') {
-    L.innerHTML = renderSelectionLeft();
-    R.innerHTML = renderSelectionRight();
-    const overlay = document.getElementById('overlay');
-    if (state.mode === 'select') {
-    // …
-    if (overlay) overlay.innerHTML = '';
+    leftEl.innerHTML = renderSelectionLeft();
+    rightEl.innerHTML = renderSelectionRight();
+    if (overlayEl) overlayEl.innerHTML = ''; // Overlay leeren im Auswahlmodus
     return;
-   }
   }
-  // RUN
-  L.innerHTML = renderRunLeft();
-  R.innerHTML = renderRunRight();
-  if (overlay) overlay.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
 
-  const overlay = document.getElementById('overlay');
-  if (overlay) overlay.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
+  // RUN
+  leftEl.innerHTML = renderRunLeft();
+  rightEl.innerHTML = renderRunRight();
+  if (overlayEl) overlayEl.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
 }
 
 function renderSelectionLeft(){
@@ -135,7 +132,13 @@ function renderRunRight(){
         const here = i===state.heroPos ? '🧍' : '';
         const effects = (tile.effects||[]).map(e=>`<span class="pill">${e.name}</span>`).join(' ');
         const btn = placing ? `<button data-action="place-here" data-idx="${i}">Hier platzieren</button>` : '';
-        return `<div class="tile"><div><span>${here} ${tile.label}</span> <span class="muted">${tile.type}</span> ${effects?('<div>'+effects+'</div>'):''}</div>${btn}</div>`;
+        return `<div class="tile">
+                  <div>
+                    <span>${here} ${tile.label}</span> <span class="muted">${tile.type}</span>
+                    ${effects?('<div>'+effects+'</div>'):''}
+                  </div>
+                  ${btn}
+                </div>`;
       }).join('')}
     </div>
   `;
