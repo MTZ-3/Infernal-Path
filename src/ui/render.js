@@ -1,18 +1,17 @@
-// src/ui/render.js
+// /src/ui/render.js
 import { state } from '../game/core/gameState.js';
 import { CARD_DEFS, scaledValue } from '../game/cards/cards.js';
 
 export function render(){
   const leftEl = document.getElementById('left');
   const rightEl = document.getElementById('right');
-  const overlayEl = document.getElementById('overlay'); // <-- EINMAL holen, überall benutzen
-
+  const overlayEl = document.getElementById('overlay');
   if (!leftEl || !rightEl) return;
 
   if (state.mode === 'select') {
     leftEl.innerHTML = renderSelectionLeft();
     rightEl.innerHTML = renderSelectionRight();
-    if (overlayEl) overlayEl.innerHTML = ''; // Overlay leeren im Auswahlmodus
+    if (overlayEl) overlayEl.innerHTML = '';
     return;
   }
 
@@ -24,21 +23,21 @@ export function render(){
 
 function renderSelectionLeft(){
   const defs = Object.values(CARD_DEFS);
+  const picked = state.selection.length;
   if (defs.length === 0) {
     return `
       <div class="card">
         <strong>Kartenwahl</strong>
-        <div class="muted">Keine Karten geladen. Prüfe <code>/data/cards.de.json</code> und die Browser-Konsole (F12).</div>
+        <div class="muted">Keine Karten geladen. Prüfe /data/cards.de.json</div>
       </div>
     `;
   }
-  const picked = state.selection.length;
   return `
     <div class="card">
       <strong>Kartenwahl</strong>
       <div class="muted">Wähle ${state.selectionTarget} Startkarten (gewählt: ${picked}/${state.selectionTarget}).</div>
-      <div class="row" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
-        ${defs.map(def => renderSelectCard(def)).join('')}
+      <div class="grid grid-cards">
+        ${defs.map(def => renderSelectCardTile(def)).join('')}
       </div>
       <div class="row" style="margin-top:12px;">
         <button class="primary" data-action="start-run" ${picked===state.selectionTarget?'':'disabled'}>Run starten</button>
@@ -47,18 +46,17 @@ function renderSelectionLeft(){
   `;
 }
 
-function renderSelectCard(def){
+function renderSelectCardTile(def){
   const isPicked = state.selection.includes(def.id);
-  const L = 1; // Anzeige-Level in der Auswahl
+  const L = 1;
   const val = scaledValue(def.effect || {}, L);
   return `
-    <div class="tile" style="align-items:flex-start;">
-      <div>
-        <div><strong>${def.name}</strong> <span class="muted">[${def.type}]</span></div>
-        <div class="muted">Cost: ${def.cost} · L1-Wert: ${Math.round(val)}</div>
-        <div class="muted">${def.desc}</div>
+    <div class="card-tile ${isPicked ? 'picked' : ''}" data-action="toggle-select" data-id="${def.id}">
+      <div class="ct-head">
+        <span class="ct-name">${def.name}</span>
+        <span class="ct-meta">[${def.type}] · Cost ${def.cost}</span>
       </div>
-      <button data-action="toggle-select" data-id="${def.id}">${isPicked?'Entfernen':'Hinzufügen'}</button>
+      <div class="ct-body muted">L1 → ${Math.round(val)} · ${def.desc}</div>
     </div>
   `;
 }

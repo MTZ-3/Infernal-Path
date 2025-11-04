@@ -1,0 +1,138 @@
+/* === Infernal Path Grundlayout === */
+body {
+  background-color: #0a0a0a;
+  color: #eee;
+  font-family: "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+main {
+  display: flex;
+  gap: 16px;
+  width: 90%;
+  max-width: 1200px;
+  margin-top: 20px;
+}
+
+#left, #right {
+  flex: 1;
+}
+
+/* === Kartenwahl === */
+.grid.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.card-tile {
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  background: #141414;
+  transition: 0.2s;
+}
+
+.card-tile:hover {
+  border-color: #666;
+  background: #1a1a1a;
+}
+
+.card-tile.picked {
+  border-color: #b300ff;
+  box-shadow: 0 0 0 2px rgba(179, 0, 255, 0.3) inset;
+}
+
+.ct-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ct-name {
+  font-weight: 600;
+}
+
+.ct-meta {
+  opacity: 0.7;
+  font-size: 0.9em;
+}
+
+.muted {
+  opacity: 0.75;
+}
+
+/* === Buttons & Layout === */
+button {
+  background: #222;
+  color: #eee;
+  border: 1px solid #555;
+  border-radius: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+button:hover {
+  background: #333;
+}
+button.primary {
+  background: #b300ff;
+  border-color: #b300ff;
+}
+button.primary:hover {
+  background: #c61aff;
+}
+
+.card {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+.tile {
+  background: #181818;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pill {
+  background: #222;
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 0.85em;
+}
+
+/* === Overlay === */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(10, 10, 10, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}

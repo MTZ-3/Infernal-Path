@@ -14,36 +14,25 @@ initPools();
 enterSelection();
 render();
 
-
-// Debug
-window.InfernalPath = { state, enterSelection, newRunFromSelection, nextDay, tryAttack, playCard };
+// Für Debug in der Console
+window.InfernalPath = { state, tryAttack, nextDay, playCard, placeCardOnTile };
 
 
 // Events
 window.addEventListener('click', (e) => {
-const el = e.target.closest('[data-action]');
-if (!el) return;
-const a = el.dataset.action;
+  const el = e.target.closest('[data-action]'); if (!el) return;
+  const a = el.dataset.action;
 
+  if (a === 'toggle-select') { toggleSelectCard(el.dataset.id); render(); }
+  if (a === 'start-run') { if (canStartRun()) { newRunFromSelection(); render(); } }
 
-if (a === 'toggle-select') { toggleSelectCard(el.dataset.id); render(); }
-if (a === 'start-run') { if (canStartRun()) { newRunFromSelection(); render(); } }
+  if (a === 'attack') { tryAttack(); render(); }
+  if (a === 'next-day') { nextDay(); render(); }
+  if (a === 'play-card') { playCard(el.dataset.id); render(); }
 
+  if (a === 'pick-draft') { chooseDraftCard(el.dataset.id); render(); }
 
-if (a === 'next-day') { nextDay(); render(); }
-if (a === 'attack') { tryAttack(); render(); }
-if (a === 'play-card') { playCard(el.dataset.id); render(); }
-
-
-if (a === 'place-here') { 
-  const idx = parseInt(el.dataset.idx, 10);
-  InfernalPath.placeCardOnTile ? null : null; // nur zur Sichtbarkeit im Dev-Tool
-  import('./game/core/gameState.js').then(m=>{
-    m.placeCardOnTile(idx);
-    render();
-  });
-}
-
-if (a === 'cancel-place') { 
-  import('./game/core/gameState.js').then(m=>{ m.cancelPlaceIntent(); render(); }); 
-}})
+  // Platzieren
+  if (a === 'place-here') { placeCardOnTile(parseInt(el.dataset.idx,10)); render(); }
+  if (a === 'cancel-place') { cancelPlaceIntent(); render(); }
+});
