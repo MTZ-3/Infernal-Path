@@ -10,13 +10,16 @@ export function render(){
     L.innerHTML = renderSelectionLeft();
     R.innerHTML = renderSelectionRight();
     const overlay = document.getElementById('overlay');
+    if (state.mode === 'select') {
+    // …
     if (overlay) overlay.innerHTML = '';
     return;
+   }
   }
-
   // RUN
   L.innerHTML = renderRunLeft();
   R.innerHTML = renderRunRight();
+  if (overlay) overlay.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
 
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
@@ -125,11 +128,14 @@ function renderHandCard(cid){
 }
 
 function renderRunRight(){
+  const placing = !!state.placeIntent;
   return `
     <div class="list">
-      ${state.map.map((tile, i) => {
-        const here = i === state.heroPos ? '🧍' : '';
-        return `<div class="tile"><span>${here} ${tile.label}</span><span class="muted">${tile.type}</span></div>`;
+      ${state.map.map((tile,i)=>{
+        const here = i===state.heroPos ? '🧍' : '';
+        const effects = (tile.effects||[]).map(e=>`<span class="pill">${e.name}</span>`).join(' ');
+        const btn = placing ? `<button data-action="place-here" data-idx="${i}">Hier platzieren</button>` : '';
+        return `<div class="tile"><div><span>${here} ${tile.label}</span> <span class="muted">${tile.type}</span> ${effects?('<div>'+effects+'</div>'):''}</div>${btn}</div>`;
       }).join('')}
     </div>
   `;

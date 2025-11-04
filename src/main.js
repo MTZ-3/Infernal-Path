@@ -35,5 +35,15 @@ if (a === 'attack') { tryAttack(); render(); }
 if (a === 'play-card') { playCard(el.dataset.id); render(); }
 
 
-if (a === 'pick-draft') { chooseDraftCard(el.dataset.id); render(); }
-});
+if (a === 'place-here') { 
+  const idx = parseInt(el.dataset.idx, 10);
+  InfernalPath.placeCardOnTile ? null : null; // nur zur Sichtbarkeit im Dev-Tool
+  import('./game/core/gameState.js').then(m=>{
+    m.placeCardOnTile(idx);
+    render();
+  });
+}
+
+if (a === 'cancel-place') { 
+  import('./game/core/gameState.js').then(m=>{ m.cancelPlaceIntent(); render(); }); 
+}})
