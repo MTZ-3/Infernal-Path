@@ -1,138 +1,44 @@
-/* === Infernal Path Grundlayout === */
-body {
-  background-color: #0a0a0a;
-  color: #eee;
-  font-family: "Segoe UI", sans-serif;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-main {
-  display: flex;
-  gap: 16px;
-  width: 90%;
-  max-width: 1200px;
-  margin-top: 20px;
-}
-
-#left, #right {
-  flex: 1;
-}
-
-/* === Kartenwahl === */
-.grid.grid-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
-}
-
-.card-tile {
-  border: 1px solid #333;
-  border-radius: 10px;
-  padding: 10px;
-  cursor: pointer;
-  background: #141414;
-  transition: 0.2s;
-}
-
-.card-tile:hover {
-  border-color: #666;
-  background: #1a1a1a;
-}
-
-.card-tile.picked {
-  border-color: #b300ff;
-  box-shadow: 0 0 0 2px rgba(179, 0, 255, 0.3) inset;
-}
-
-.ct-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.ct-name {
-  font-weight: 600;
-}
-
-.ct-meta {
-  opacity: 0.7;
-  font-size: 0.9em;
-}
-
-.muted {
-  opacity: 0.75;
-}
-
-/* === Buttons & Layout === */
-button {
-  background: #222;
-  color: #eee;
-  border: 1px solid #555;
-  border-radius: 8px;
-  padding: 6px 10px;
-  cursor: pointer;
-  transition: 0.2s;
-}
-button:hover {
-  background: #333;
-}
-button.primary {
-  background: #b300ff;
-  border-color: #b300ff;
-}
-button.primary:hover {
-  background: #c61aff;
-}
-
-.card {
-  background: #111;
-  border: 1px solid #333;
-  border-radius: 10px;
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.tile {
-  background: #181818;
-  border-radius: 8px;
-  padding: 8px;
-}
-
-.row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.pill {
-  background: #222;
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 0.85em;
-}
-
-/* === Overlay === */
-.modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(10, 10, 10, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
+:root{ --bg:#0b0b12; --panel:#141422; --muted:#8b88a1; --text:#e7e4f2; --accent:#b71c1c; --accent2:#5e2ca5; }
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0; font-family:ui-sans-serif,system-ui,Inter,Roboto,Arial; background:radial-gradient(1200px 800px at 80% -10%, #1a1531 0%, #0b0b12 60%); color:var(--text)}
+.app{display:grid; grid-template-columns:280px 1fr 300px; grid-template-rows:auto 1fr auto; gap:12px; padding:16px}
+.panel{background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(0,0,0,.2)), var(--panel); border:1px solid rgba(255,255,255,.06); border-radius:14px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+.top{grid-column:1/4; display:flex; gap:12px}
+.stat{flex:1}
+.row{display:flex; align-items:center; justify-content:space-between; margin:.25rem 0}
+.board{grid-column:1/4; display:grid; grid-template-columns:280px 1fr 300px; gap:12px}
+.leftcol,.rightcol{display:flex; flex-direction:column; gap:12px}
+.centercol{display:grid; grid-template-rows:260px 1fr; gap:12px}
+.bar{height:12px; background:#1f1c2e; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,.06)}
+.bar>div{height:100%; background:linear-gradient(90deg, var(--accent2), #e11d48)}
+.hero{display:grid; grid-template-columns:1fr 1fr; gap:12px; position:relative}
+.hero .big{grid-column:1/3; height:140px; background: repeating-linear-gradient(45deg, #1a1927 0 6px, #12111b 6px 12px); border-radius:12px; border:1px dashed rgba(255,255,255,.08); display:flex; align-items:center; justify-content:center; font-weight:600; letter-spacing:.5px}
+.track{height:14px; border-radius:12px; background:#1a1623; position:relative; border:1px solid rgba(255,255,255,.06)}
+.puck{position:absolute; top:1px; height:10px; width:10px; border-radius:50%; background:#f87171}
+.hand{display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start}
+.card{width:148px; min-height:180px; background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.25)), #171526; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:10px; cursor:pointer; position:relative; transition:transform .12s ease, box-shadow .12s ease}
+.card:hover{transform:translateY(-3px); box-shadow:0 12px 24px rgba(0,0,0,.35)}
+.card .name{font-weight:700; font-size:14px; margin-bottom:6px}
+.card .type{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.08em}
+.badge{position:absolute; right:8px; top:8px; font-size:12px; padding:2px 8px; border-radius:999px; background:#2a243a; border:1px solid rgba(255,255,255,.08)}
+.cost{position:absolute; left:8px; top:8px; height:28px; width:28px; border-radius:10px; background:#2a243a; border:1px solid rgba(255,255,255,.1); display:grid; place-items:center; font-weight:800}
+.desc{font-size:12px; color:#c5c1d8; margin-top:8px}
+.actions{display:flex; gap:6px; margin-top:8px}
+button{background:#251c33; color:var(--text); border:1px solid rgba(255,255,255,.08); padding:8px 10px; border-radius:10px; cursor:pointer}
+button.primary{background:linear-gradient(180deg, #5b21b6, #3b0764); border-color:#6d28d9}
+button.warn{background:linear-gradient(180deg, #7c2d12, #3f0a0a); border-color:#b45309}
+button:disabled{opacity:.5; cursor:not-allowed}
+.altar{border:2px dashed rgba(255,255,255,.15); border-radius:14px; padding:10px; text-align:center; color:var(--muted)}
+.shop-item{display:flex; justify-content:space-between; align-items:center; padding:8px; background:#1a1625; border-radius:10px; margin:6px 0; border:1px solid rgba(255,255,255,.06)}
+.footer{grid-column:1/4; display:flex; justify-content:space-between; align-items:center}
+.muted{color:var(--muted)} .small{font-size:12px} .k{color:#a78bfa} .soul{color:#fca5a5}
+.selected{outline:2px solid var(--accent2); transform:translateY(-6px)}
+.overlay{position:fixed; inset:0; background:rgba(6,5,12,.8); display:none; align-items:center; justify-content:center; z-index:50}
+.overlay .inner{background:#161427; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; width:min(960px,92vw); max-height:90vh; overflow:auto}
+.grid{display:grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap:10px}
+#map svg{width:100%; height:120px}
+.node{fill:#0b0b12; stroke:#cbd5e1; stroke-width:3; cursor:pointer}
+.link{stroke:#8b6f57; stroke-width:4}
+.demon{position:absolute; right:18px; top:18px; width:36px; height:36px; border-radius:50%; background:#2b2136; border:1px solid rgba(255,255,255,.1); display:grid; place-items:center; cursor:pointer}
+.demon:after{content:'🜏'}

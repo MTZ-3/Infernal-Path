@@ -1,177 +1,67 @@
-// /src/ui/render.js
-import { state } from '../game/core/gameState.js';
-import { CARD_DEFS, scaledValue } from '../game/cards/cards.js';
+import { GameState, BASE_ENERGY, BASE_DRAW } from "../core/gameState.js";
+import { drawCards, sacrifice } from "../game/cards/cards.js";
+
+
+export function mountUI(root){
+root.innerHTML = `
+<div class="app">
+<div class="top">
+<div class="panel stat">
+<h2>Run-Status</h2>
+<div class="row"><span>Tag</span><strong id="ui-day">1 / 10</strong></div>
+<div class="row"><span>Energie</span><strong id="ui-energy">0</strong></div>
+<div class="row"><span>Seelenfragmente</span><strong id="ui-souls" class="soul">0</strong></div>
+<div class="row"><span>Ziehkarten / Handlimit</span><strong id="ui-draw">5 / 7</strong></div>
+</div>
+<div class="panel stat">
+<h2>Held</h2>
+<div class="bar"><div id="ui-hero-hpbar" style="width:100%"></div></div>
+<div class="row"><span>HP</span><strong id="ui-hero-hp">—</strong></div>
+<div class="row"><span>Effekte</span><strong id="ui-hero-effects" class="small muted">–</strong></div>
+<div class="row"><span>Distanz zum Schloss</span><strong id="ui-hero-dist">—</strong></div>
+</div>
+<div class="panel stat">
+<h2>Aktive Runen</h2>
+<div class="row small"><label><input type="checkbox" id="rune-draw" /> +1 Karte pro Tag</label></div>
+<div class="row small"><label><input type="checkbox" id="rune-energy" /> +1 Energie Start</label></div>
+<div class="row small"><label><input type="checkbox" id="rune-soul" /> +1 Fragment pro Held</label></div>
+<div class="small muted">(Temporär für diesen Prototyp)</div>
+</div>
+</div>
+
+
+<div class="board">
+<div class="leftcol">
+<div class="panel"><h3>Opferaltar</h3><div class="altar small" id="altar">Karte hier ablegen oder ausgewählte Karte anklicken.</div></div>
+<div class="panel"><h3>Runen-Shop</h3><div id="shop"></div><button id="btn-reroll-shop">Angebote neu würfeln (2 ■)</button></div>
+</div>
+<div class="centercol">
+<div class="panel hero"><div class="demon" id="btn-demon" title="Runen-Shop öffnen"></div><div class="big" id="map"></div>
+<div>
+<div class="small muted">Bewegungsleiste</div>
+<div class="track" id="track"><div class="puck" id="puck" style="left:0"></div></div>
+<div class="small muted" id="track-label">Start → Schloss</div>
+</div>
+<div><div class="small muted">Notizen</div><div class="small">Raserei: Bei 50% HP doppelte Bewegung.</div></div>
+</div>
+<div class="panel"><h3>Hand</h3><div id="hand" class="hand"></div></div>
+</div>
+<div class="rightcol">
+<div class="panel"><h3>Deck</h3><div class="small">Draw: <span id="ui-deck-count">0</span> | Ablage: <span id="ui-discard-count">0</span></div><div class="small muted" id="ui-log" style="margin-top:8px; max-height:180px; overflow:auto"></div></div>
+<div class="panel"><h3>Aktionen</h3><button id="btn-end-day" class="primary">Tag beenden</button><button id="btn-new-run" class="warn">Neuer Run</button></div>
+</div>
+</div>
+<div class="overlay" id="overlay"><div class="inner" id="overlay-inner"></div></div>
+<div class="footer"><div class="small muted">Infernal Path – Modular Proto</div><div class="small">Karte anklicken ⇒ Map-Knoten oder Altar.</div></div>
+</div>`;
+}
+
 
 export function render(){
-  const leftEl = document.getElementById('left');
-  const rightEl = document.getElementById('right');
-  const overlayEl = document.getElementById('overlay');
-  if (!leftEl || !rightEl) return;
-
-  if (state.mode === 'select') {
-    leftEl.innerHTML = renderSelectionLeft();
-    rightEl.innerHTML = renderSelectionRight();
-    if (overlayEl) overlayEl.innerHTML = '';
-    return;
-  }
-
-  // RUN
-  leftEl.innerHTML = renderRunLeft();
-  rightEl.innerHTML = renderRunRight();
-  if (overlayEl) overlayEl.innerHTML = state.draftOpen ? renderDraftOverlay() : '';
-}
-
-function renderSelectionLeft(){
-  const defs = Object.values(CARD_DEFS);
-  const picked = state.selection.length;
-  if (defs.length === 0) {
-    return `
-      <div class="card">
-        <strong>Kartenwahl</strong>
-        <div class="muted">Keine Karten geladen. Prüfe /data/cards.de.json</div>
-      </div>
-    `;
-  }
-  return `
-    <div class="card">
-      <strong>Kartenwahl</strong>
-      <div class="muted">Wähle ${state.selectionTarget} Startkarten (gewählt: ${picked}/${state.selectionTarget}).</div>
-      <div class="grid grid-cards">
-        ${defs.map(def => renderSelectCardTile(def)).join('')}
-      </div>
-      <div class="row" style="margin-top:12px;">
-        <button class="primary" data-action="start-run" ${picked===state.selectionTarget?'':'disabled'}>Run starten</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderSelectCardTile(def){
-  const isPicked = state.selection.includes(def.id);
-  const L = 1;
-  const val = scaledValue(def.effect || {}, L);
-  return `
-    <div class="card-tile ${isPicked ? 'picked' : ''}" data-action="toggle-select" data-id="${def.id}">
-      <div class="ct-head">
-        <span class="ct-name">${def.name}</span>
-        <span class="ct-meta">[${def.type}] · Cost ${def.cost}</span>
-      </div>
-      <div class="ct-body muted">L1 → ${Math.round(val)} · ${def.desc}</div>
-    </div>
-  `;
-}
-
-function renderSelectionRight(){
-  return `
-    <div class="card">
-      <strong>Ausgewählt</strong>
-      <div class="list">
-        ${state.selection.map(cid => {
-          const c = CARD_DEFS[cid];
-          return `<div class="tile"><span>${c?.name || cid}</span><span class="muted">${c?.type || ''}</span></div>`;
-        }).join('') || '<div class="muted">(noch leer)</div>'}
-      </div>
-    </div>
-  `;
-}
-
-function renderRunLeft(){
-  return `
-    <div class="row">
-      <span class="pill">Tag: ${state.day}/${state.maxDay}</span>
-      <span class="pill">Energie: ${state.energy}</span>
-      <span class="pill">Seelen: ${state.souls}</span>
-    </div>
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <strong>Held</strong>
-        <span class="muted">${state.hero?.name || '-'}</span>
-      </div>
-      <div class="row">
-        <span class="pill">HP: ${state.hero.hp}/${state.hero.maxHp}</span>
-        <span class="pill">Verwundb.: ${state.effects.vulnStacks}×</span>
-        <span class="pill">Blutung: ${state.effects.bleed}</span>
-      </div>
-      <div class="row" style="margin-top:8px;">
-        <button data-action="attack">Angreifen (-1E)</button>
-        <button class="primary" data-action="next-day">Nächster Tag</button>
-      </div>
-    </div>
-    <div class="card">
-      <strong>Hand</strong>
-      <div class="row" style="flex-wrap:wrap; gap:10px; margin-top:6px;">
-        ${state.hand.map(cid => renderHandCard(cid)).join('') || '<span class="muted">(leer)</span>'}
-      </div>
-    </div>
-  `;
-}
-
-function renderHandCard(cid){
-  const c = CARD_DEFS[cid];
-  const L = currentLevelForUI();
-  const val = scaledValue(c.effect || {}, L);
-  const disabled = (c.cost || 0) > state.energy ? 'disabled' : '';
-  return `
-    <button class="tile" data-action="play-card" data-id="${c.id}" ${disabled}>
-      <div>
-        <div><strong>${c.name}</strong> <span class="muted">Cost ${c.cost}</span></div>
-        <div class="muted">Lvl ${L} → Wert ${Math.round(val)} · ${c.desc}</div>
-      </div>
-      <span class="pill">${c.cost}E</span>
-    </button>
-  `;
-}
-
-function renderRunRight(){
-  const placing = !!state.placeIntent;
-  return `
-    <div class="list">
-      ${state.map.map((tile,i)=>{
-        const here = i===state.heroPos ? '🧍' : '';
-        const effects = (tile.effects||[]).map(e=>`<span class="pill">${e.name}</span>`).join(' ');
-        const btn = placing ? `<button data-action="place-here" data-idx="${i}">Hier platzieren</button>` : '';
-        return `<div class="tile">
-                  <div>
-                    <span>${here} ${tile.label}</span> <span class="muted">${tile.type}</span>
-                    ${effects?('<div>'+effects+'</div>'):''}
-                  </div>
-                  ${btn}
-                </div>`;
-      }).join('')}
-    </div>
-  `;
-}
-
-function renderDraftOverlay(){
-  const L = currentLevelForUI();
-  return `
-    <div class="modal">
-      <div class="card">
-        <strong>Tages-Draft</strong>
-        <div class="muted">Wähle 1 von 3 Karten (Level ${L}).</div>
-        <div class="row" style="margin-top:8px; gap:8px; flex-wrap:wrap;">
-          ${state.draftOptions.map(cid => renderDraftOption(cid, L)).join('')}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderDraftOption(cid, L){
-  const c = CARD_DEFS[cid];
-  const val = scaledValue(c.effect || {}, L);
-  return `
-    <button class="tile" data-action="pick-draft" data-id="${c.id}">
-      <div>
-        <div><strong>${c.name}</strong> <span class="muted">[${c.type}]</span></div>
-        <div class="muted">Lvl ${L} → Wert ${Math.round(val)}</div>
-        <div class="muted">${c.desc}</div>
-      </div>
-      <span class="pill">${c.cost}E</span>
-    </button>
-  `;
-}
-
-function currentLevelForUI(){
-  return state.powerLevel || state.day || 1;
-}
+document.querySelector('#ui-day').textContent = `${GameState.day} / ${GameState.maxDays}`;
+document.querySelector('#ui-draw').textContent = `${BASE_DRAW+(GameState.runes.draw?1:0)} / 7`;
+document.querySelector('#ui-energy').textContent = GameState.energy;
+document.querySelector('#ui-souls').textContent = GameState.souls;
+if(GameState.hero){
+const h=GameState.hero; const hpPerc = Math.max(0,Math.min(100,(h.hp/h.maxHp)*100));
+}}

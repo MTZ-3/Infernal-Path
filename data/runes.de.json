@@ -1,5 +1,5 @@
 [
-{ "key":"rune_draw", "name":"Rune der Gier", "cost":12, "desc":"Ziehe pro Runde 1 Karte mehr." },
-{ "key":"rune_damage", "name":"Rune der Finsternis", "cost":15, "desc":"+1 Schaden für Dämonen-Angriffe." },
-{ "key":"rune_energy", "name":"Rune der Opferung", "cost":10, "desc":"+1 maximale Energie." }
+{"id":"r_draw","name":"+1 Karte pro Tag","cost":6,"apply":{"drawPerDay":1}},
+{"id":"r_energy","name":"+1 Energie Start","cost":6,"apply":{"energy":1}},
+{"id":"r_soul","name":"+1 Seele pro Held","cost":8,"apply":{"soulOnKill":1}}
 ]
