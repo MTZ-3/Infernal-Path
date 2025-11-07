@@ -1,5 +1,5 @@
 import { GameState } from "../core/gameState.js";
-import { playCard } from "../game/cards/cards.js";
+import { playCard } from "../cards/cards.js";
 
 
 export function mountStaticMap(root){

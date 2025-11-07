@@ -1,67 +1,152 @@
-import { GameState, BASE_ENERGY, BASE_DRAW } from "../core/gameState.js";
+import { GameState, BASE_ENERGY } from "../game/core/gameState.js";
 import { drawCards, sacrifice } from "../game/cards/cards.js";
+import { playCard } from "../game/cards/cards.js";
 
+let logBox;
 
-export function mountUI(root){
-root.innerHTML = `
-<div class="app">
-<div class="top">
-<div class="panel stat">
-<h2>Run-Status</h2>
-<div class="row"><span>Tag</span><strong id="ui-day">1 / 10</strong></div>
-<div class="row"><span>Energie</span><strong id="ui-energy">0</strong></div>
-<div class="row"><span>Seelenfragmente</span><strong id="ui-souls" class="soul">0</strong></div>
-<div class="row"><span>Ziehkarten / Handlimit</span><strong id="ui-draw">5 / 7</strong></div>
-</div>
-<div class="panel stat">
-<h2>Held</h2>
-<div class="bar"><div id="ui-hero-hpbar" style="width:100%"></div></div>
-<div class="row"><span>HP</span><strong id="ui-hero-hp">—</strong></div>
-<div class="row"><span>Effekte</span><strong id="ui-hero-effects" class="small muted">–</strong></div>
-<div class="row"><span>Distanz zum Schloss</span><strong id="ui-hero-dist">—</strong></div>
-</div>
-<div class="panel stat">
-<h2>Aktive Runen</h2>
-<div class="row small"><label><input type="checkbox" id="rune-draw" /> +1 Karte pro Tag</label></div>
-<div class="row small"><label><input type="checkbox" id="rune-energy" /> +1 Energie Start</label></div>
-<div class="row small"><label><input type="checkbox" id="rune-soul" /> +1 Fragment pro Held</label></div>
-<div class="small muted">(Temporär für diesen Prototyp)</div>
-</div>
-</div>
-
-
-<div class="board">
-<div class="leftcol">
-<div class="panel"><h3>Opferaltar</h3><div class="altar small" id="altar">Karte hier ablegen oder ausgewählte Karte anklicken.</div></div>
-<div class="panel"><h3>Runen-Shop</h3><div id="shop"></div><button id="btn-reroll-shop">Angebote neu würfeln (2 ■)</button></div>
-</div>
-<div class="centercol">
-<div class="panel hero"><div class="demon" id="btn-demon" title="Runen-Shop öffnen"></div><div class="big" id="map"></div>
-<div>
-<div class="small muted">Bewegungsleiste</div>
-<div class="track" id="track"><div class="puck" id="puck" style="left:0"></div></div>
-<div class="small muted" id="track-label">Start → Schloss</div>
-</div>
-<div><div class="small muted">Notizen</div><div class="small">Raserei: Bei 50% HP doppelte Bewegung.</div></div>
-</div>
-<div class="panel"><h3>Hand</h3><div id="hand" class="hand"></div></div>
-</div>
-<div class="rightcol">
-<div class="panel"><h3>Deck</h3><div class="small">Draw: <span id="ui-deck-count">0</span> | Ablage: <span id="ui-discard-count">0</span></div><div class="small muted" id="ui-log" style="margin-top:8px; max-height:180px; overflow:auto"></div></div>
-<div class="panel"><h3>Aktionen</h3><button id="btn-end-day" class="primary">Tag beenden</button><button id="btn-new-run" class="warn">Neuer Run</button></div>
-</div>
-</div>
-<div class="overlay" id="overlay"><div class="inner" id="overlay-inner"></div></div>
-<div class="footer"><div class="small muted">Infernal Path – Modular Proto</div><div class="small">Karte anklicken ⇒ Map-Knoten oder Altar.</div></div>
-</div>`;
+// ----------------------------------------------------
+// ========== UI Setup ==========
+// ----------------------------------------------------
+export function mountUI(app) {
+  app.innerHTML = `
+    <div id="top-bar">
+      <div id="stats"></div>
+      <button id="btn-new-run">Neuer Run</button>
+      <button id="btn-end-day">Tag beenden</button>
+      <button id="btn-demon">👁 Dämon</button>
+    </div>
+    <div id="map"></div>
+    <div id="runes"></div>
+    <div id="hand" class="hand"></div>
+    <div id="altar" class="altar">Opferaltar</div>
+    <div id="log" class="log"></div>
+    <div id="overlay"><div id="overlay-inner"></div></div>
+  `;
+  logBox = document.querySelector("#log");
 }
 
+// ----------------------------------------------------
+// ========== Log- & Renderfunktionen ==========
+// ----------------------------------------------------
+export function bindLogs() {
+  window.__log = (msg) => log(msg);
+  window.__render = () => render();
+}
 
-export function render(){
-document.querySelector('#ui-day').textContent = `${GameState.day} / ${GameState.maxDays}`;
-document.querySelector('#ui-draw').textContent = `${BASE_DRAW+(GameState.runes.draw?1:0)} / 7`;
-document.querySelector('#ui-energy').textContent = GameState.energy;
-document.querySelector('#ui-souls').textContent = GameState.souls;
-if(GameState.hero){
-const h=GameState.hero; const hpPerc = Math.max(0,Math.min(100,(h.hp/h.maxHp)*100));
-}}
+function log(msg) {
+  if (!logBox) return;
+  const div = document.createElement("div");
+  div.innerHTML = msg;
+  logBox.appendChild(div);
+  logBox.scrollTop = logBox.scrollHeight;
+}
+
+export function render() {
+  const s = GameState;
+  const stats = document.querySelector("#stats");
+  if (!stats) return;
+
+  const h = s.hero;
+  const heroStatus = h
+    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – Distanz: ${h.dist} – ${h.alive ? "Lebt" : "Tot"}`
+    : "kein Held";
+
+  stats.innerHTML = `
+    <b>Tag ${s.day}</b> |
+    Energie: ${s.energy}/${BASE_ENERGY} |
+    Seelen: ${s.souls} |
+    ${heroStatus}
+  `;
+
+  const hand = document.querySelector("#hand");
+  hand.innerHTML = "";
+  s.hand.forEach((card) => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.draggable = true;
+    div.innerHTML = `<b>${card.name}</b><br>${card.desc}`;
+    div.onclick = () => {
+      s.targeting = card;
+      log(`Karte gewählt: ${card.name}`);
+    };
+    hand.appendChild(div);
+  });
+}
+
+// ----------------------------------------------------
+// ========== Overlays (Draft / Portal) ==========
+// ----------------------------------------------------
+export function showDraft(cards) {
+  const overlay = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  overlay.style.display = "flex";
+
+  let chosen = [];
+  inner.innerHTML = `
+    <h2>Kartenauswahl</h2>
+    <p>Wähle 10 Karten für deinen Run.</p>
+    <div id="draft-grid" class="grid"></div>
+    <button id="draft-done" disabled>Starten</button>
+  `;
+  const grid = inner.querySelector("#draft-grid");
+
+  cards.forEach((c) => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `<b>${c.name}</b><br>${c.desc}`;
+    div.onclick = () => {
+      if (chosen.includes(c.id)) {
+        chosen = chosen.filter((x) => x !== c.id);
+        div.style.outline = "";
+      } else if (chosen.length < 10) {
+        chosen.push(c.id);
+        div.style.outline = "2px solid red";
+      }
+      inner.querySelector("#draft-done").disabled = chosen.length !== 10;
+    };
+    grid.appendChild(div);
+  });
+
+  inner.querySelector("#draft-done").onclick = () => {
+    overlay.style.display = "none";
+    window.__startRun(chosen);
+  };
+}
+
+export function showPortalOffer(cards) {
+  const overlay = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  overlay.style.display = "flex";
+
+  const picks = shuffle(cards).slice(0, 3);
+  inner.innerHTML = `
+    <h2>Portal öffnet sich</h2>
+    <p>Wähle 1 Karte.</p>
+    <div id="portal-grid" class="grid"></div>
+  `;
+  const grid = inner.querySelector("#portal-grid");
+  picks.forEach((c) => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `<b>${c.name}</b><br>${c.desc}`;
+    div.onclick = () => {
+      GameState.hand.push({ ...c, uid: Math.random().toString(36).slice(2) });
+      overlay.style.display = "none";
+      window.__log(`Portal: ${c.name} gewählt.`);
+      window.__render();
+    };
+    grid.appendChild(div);
+  });
+}
+
+// ----------------------------------------------------
+// Hilfsfunktionen
+// ----------------------------------------------------
+function shuffle(a) {
+  const arr = [...a];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}

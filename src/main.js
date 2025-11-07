@@ -1,9 +1,9 @@
-import { GameState, uid } from "./core/gameState.js";
+import { GameState, uid } from "./game/core/gameState.js";
 import { mountUI, render, bindLogs, showDraft, showPortalOffer } from "./ui/render.js";
 import { setCardLibrary, bindLogger as bindCardLogger } from "./game/cards/cards.js";
-import { createHero, bindLogger as bindHeroLogger } from "./hero/hero.js";
-import { beginDay, endDay } from "./core/turns.js";
-import { mountStaticMap } from "./map/map.js";
+import { createHero, bindLogger as bindHeroLogger } from "./game/hero/hero.js";
+import { beginDay, endDay } from "./game/core/turns.js";
+import { mountStaticMap } from "./game/map/map.js";
 
 const app = document.querySelector('#app');
 mountUI(app); bindLogs(); // setzt window.__log / __render

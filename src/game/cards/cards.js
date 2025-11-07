@@ -1,4 +1,4 @@
-import { GameState, clamp } from "../../core/gameState.js";
+import { GameState, clamp } from "../core/gameState.js";
 
 export let CARD_LIBRARY = [];
 export function setCardLibrary(cards){ CARD_LIBRARY = cards; }

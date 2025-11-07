@@ -1,5 +1,5 @@
 import { GameState, BASE_ENERGY, clamp } from "./gameState.js";
-import { drawCards, reshuffleIfNeeded } from "../game/cards/cards.js";
+import { drawCards, reshuffleIfNeeded } from "../cards/cards.js";
 
 export function beginDay(){
   GameState.energy = BASE_ENERGY + (GameState.runes.energy?1:0);

@@ -1,5 +1,5 @@
 import { GameState, clamp } from "../core/gameState.js";
-import { bindTakeDamage } from "../game/cards/cards.js";
+import { bindTakeDamage } from "../cards/cards.js";
 
 let _logCb=null; export function bindLogger(fn){ _logCb=fn; }
 function log(m){ if(_logCb) _logCb(m); }
