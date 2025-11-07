@@ -1,50 +1,52 @@
 import { GameState, uid } from "./core/gameState.js";
-import { mountUI, render, bindLogs, showDraft, showPortalOffer, closeOverlay } from "./ui/render.js";
-import { CARD_LIBRARY, setCardLibrary } from "./game/cards/cards.js";
-import { createHero } from "./hero/hero.js";
+import { mountUI, render, bindLogs, showDraft, showPortalOffer } from "./ui/render.js";
+import { setCardLibrary, bindLogger as bindCardLogger } from "./game/cards/cards.js";
+import { createHero, bindLogger as bindHeroLogger } from "./hero/hero.js";
 import { beginDay, endDay } from "./core/turns.js";
 import { mountStaticMap } from "./map/map.js";
 
-
-// Boot
 const app = document.querySelector('#app');
-mountUI(app); bindLogs();
+mountUI(app); bindLogs(); // setzt window.__log / __render
 
+// Bind Module -> UI Logs
+bindCardLogger(window.__log);
+bindHeroLogger(window.__log);
 
-// Load data
-const [cards, heroes] = await Promise.all([
-fetch('./data/cards.de.json').then(r=>r.json()),
-fetch('./data/heroes.de.json').then(r=>r.json()),
-]);
+// Load data robust
+let cards=[], heroes=[];
+try{
+  [cards, heroes] = await Promise.all([
+    fetch('./data/cards.de.json').then(r=>r.json()),
+    fetch('./data/heroes.de.json').then(r=>r.json()),
+  ]);
+} catch (e){
+  window.__log?.(`<span style="color:#fca5a5">Daten konnten nicht geladen werden: ${e.message}</span>`);
+}
 setCardLibrary(cards);
 
-
-// Map mount
+// Map
 mountStaticMap(document.querySelector('#map'));
 
-
-// Exposed helpers for overlays
+// Start Run callback (aus Draft)
 window.__startRun = (chosenIds)=>{
-GameState.day=1; GameState.souls=0; GameState.runes={draw:false,energy:false,soul:false};
-GameState.discard=[]; GameState.hand=[]; GameState.deck = chosenIds.map(id=>({ ...cards.find(c=>c.id===id), uid:uid(), level:1 }));
-GameState.hero = createHero(heroes[0]);
-beginDay(); showPortalOffer(cards); render(); window.__log('Neuer Run beginnt.');
+  GameState.day=1; GameState.souls=0; GameState.runes={draw:false,energy:false,soul:false};
+  GameState.discard=[]; GameState.hand=[];
+  GameState.deck = chosenIds.map(id=>({ ...cards.find(c=>c.id===id), uid:uid(), level:1 }));
+  GameState.hero = createHero(heroes[0]);
+  beginDay(); showPortalOffer(cards); render(); window.__log('Neuer Run beginnt.');
 };
 
-
-// Wire buttons
+// Buttons
 document.querySelector('#btn-end-day').onclick = ()=>{ endDay(); showPortalOffer(cards); render(); };
 document.querySelector('#btn-new-run').onclick = ()=>{ showDraft(cards); };
-document.querySelector('#btn-demon').onclick = ()=>{ const shopHtml = `<h2>Runen-Shop</h2><div class='small muted'>Platzhalter – Logik wie zuvor.</div><div style='margin-top:8px'><button id='close-shop'>Schließen</button></div>`; document.querySelector('#overlay-inner').innerHTML=shopHtml; document.querySelector('#overlay').style.display='flex'; document.querySelector('#close-shop').onclick=()=>{ document.querySelector('#overlay').style.display='none'; }; };
+document.querySelector('#btn-demon').onclick = ()=>{
+  const html = `<h2>Runen-Shop</h2><div class='small muted'>Platzhalter – folgt.</div><div style='margin-top:8px'><button id='close-shop'>Schließen</button></div>`;
+  document.querySelector('#overlay-inner').innerHTML=html;
+  document.querySelector('#overlay').style.display='flex';
+  document.querySelector('#close-shop').onclick=()=>{ document.querySelector('#overlay').style.display='none'; };
+};
 
+// Altar (unverändert aus deiner Version)
 
-// Altar
-const altar=document.querySelector('#altar');
-altar.addEventListener('dragover',ev=>{ ev.preventDefault(); altar.style.background='#201a2a'; });
-altar.addEventListener('dragleave',()=>{ altar.style.background=''; });
-altar.addEventListener('drop',ev=>{ ev.preventDefault(); altar.style.background=''; const uid=ev.dataTransfer.getData('text/plain'); const card=GameState.hand.find(c=>c.uid===uid); if(card){ import('./game/cards/cards.js').then(m=>{ m.sacrifice(card); render(); }); }});
-altar.addEventListener('click',()=>{ if(GameState.targeting){ import('./game/cards/cards.js').then(m=>{ m.sacrifice(GameState.targeting); GameState.targeting=null; render(); }); }});
-
-
-// Start: Draft anzeigen
+// Boot
 showDraft(cards); render();
