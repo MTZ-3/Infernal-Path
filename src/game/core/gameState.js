@@ -8,7 +8,7 @@
 // ---- Basiswerte / Limits ----------------------------------------------------
 export const BASE_ENERGY = 3;   // Start-Energie pro Tag (ohne Runen)
 export const HAND_LIMIT  = 7;   // max. Karten in der Hand (Draw stoppt vorher)
-export const BASE_DRAW   = 5;   // Karten, die zu Tagesbeginn gezogen werden
+export const BASE_DRAW   = 4;   // Karten, die zu Tagesbeginn gezogen werden
 export let   RUN_DAYS    = 10;  // Ziel-Tage (kann durch Karten verlängert werden)
 
 // ---- Zentraler State --------------------------------------------------------
@@ -19,6 +19,7 @@ export const GameState = {
   maxDays: RUN_DAYS,    // dynamisch erweiterbar (z. B. durch Karten)
   energy: 0,            // verfügbare Energie im aktuellen Tag
   souls: 0,             // Währung für Runen/Meta
+  round: 1,             // <— NEU: wie viele Helden besiegt (Start = 1)
 
   // --- Deck/Hand/Ablage ---
   // Deck/Hand: Arrays von INSTANZEN { uid, tplId, level }

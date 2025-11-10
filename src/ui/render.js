@@ -53,6 +53,20 @@ export function mountUI(app) {
 export function bindLogs() {
   window.__log = (msg) => log(msg);
   window.__render = () => render();
+  // Nicht-blockierende Kurzmeldung (~1s)
+  window.__toast = (html, ms = 1000) => {
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.innerHTML = html;
+    document.body.appendChild(t);
+    // kleines Fade-in
+    requestAnimationFrame(() => t.classList.add("show"));
+    // Auto-hide
+    setTimeout(() => {
+      t.classList.remove("show");
+      setTimeout(() => t.remove(), 200);
+  }, ms);
+};
 }
 
 function log(msg) {
@@ -77,6 +91,7 @@ export function render() {
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
+    <b>Runde ${s.round}</b> |
     Energie: ${s.energy}/${BASE_ENERGY} |
     Seelen: ${s.souls} |
     Hand: ${s.hand.length} |
@@ -182,40 +197,69 @@ function closeOverlayFullscreen() {
   document.documentElement.style.overflow = "";
 }
 
-// Portal: 3 Vorlagen zur Wahl; Auswahl wird als INSTANZ in die Hand gelegt.
+// Portal: 3 Vorlagen zur Wahl; Auswahl wird als INSTANZ ins DECK gelegt
+// Level = aktuelle Runde (ab Runde 2 → Level 2, etc.)
 export function showPortalOffer(cards) {
   const overlay = document.querySelector("#overlay");
-  const inner = document.querySelector("#overlay-inner");
+  const inner   = document.querySelector("#overlay-inner");
+
+  // UI vorbereiten
+  inner.classList.remove("fullscreen");
+  overlay.classList.remove("fullscreen");
   overlay.style.display = "flex";
 
-  const picks = shuffle(cards).slice(0, 3); // Vorlagen!
+  const picks = shuffle(cards).slice(0, 3); // 3 zufällige TEMPLATES
   inner.innerHTML = `
     <h2>Portal öffnet sich</h2>
-    <p>Wähle 1 Karte.</p>
+    <p>Wähle 1 Karte (Level ${Math.max(1, GameState.round || 1)}).</p>
     <div id="portal-grid" class="grid"></div>
+    <div style="margin-top:10px; display:flex; justify-content:flex-end">
+      <button id="portal-cancel">Schließen</button>
+    </div>
   `;
+
   const grid = inner.querySelector("#portal-grid");
+  const lvl  = Math.max(1, GameState.round || 1); // ← Regel: Level = Runde
+
   picks.forEach((tpl) => {
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
       <div class="cost">${tpl.cost ?? 1}</div>
       <div class="badge">${tpl.type}</div>
-      <div class="name">${tpl.name}</div>
+      <div class="name">${tpl.name} <span class="small muted">· L${lvl}</span></div>
       <div class="desc small">${tpl.desc}</div>
       ${elementsHtml(tpl.elements || [])}
     `;
     div.onclick = () => {
-      // Auswahl als INSTANZ auf die Hand (oder ins Deck – je nach Design)
-      const inst = newInstance(tpl.id, 1);
-      GameState.hand.push(inst);
+      // Instanz bauen mit gewünschtem Level
+      const inst = newInstance(tpl.id, lvl);
+
+      // Design-Entscheidung: INS DECK legen, leicht mischen, und 1 Karte nachziehen
+      GameState.deck.push(inst);
+      // leichtes Shuffle (lokal, ohne extra Import)
+      for (let i = GameState.deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [GameState.deck[i], GameState.deck[j]] = [GameState.deck[j], GameState.deck[i]];
+      }
+
+      // optional: sofort eine Karte ziehen (fühlt sich „rewarding“ an)
+      // Achtung: drawCards ist in cards.js – falls du hier ziehen willst, importiere es oben.
+      // import { drawCards } from "../game/cards/cards.js";
+      // drawCards(1);
+
       overlay.style.display = "none";
-      window.__log?.(`Portal: ${tpl.name} erhalten.`);
+      window.__log?.(`Portal: ${tpl.name} (L${lvl}) erhalten.`);
       window.__render?.();
     };
     grid.appendChild(div);
   });
+
+  // Schließen-Button & Klick auf Overlay-Hintergrund
+  inner.querySelector("#portal-cancel").onclick = () => (overlay.style.display = "none");
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = "none"; };
 }
+
 
 // ----------------------------------------------------
 // Hilfsfunktionen (nur für UI)

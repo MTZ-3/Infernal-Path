@@ -81,7 +81,7 @@ window.__startRun = (chosenTplIds) => {
   GameState.deck  = shuffle(instances);
 
   // Held setzen (einmal pro Run)
-  GameState.hero = createHero(heroes[0]);
+ window.__spawnHero();
 
   // Startposition auf der Map (erster Node), falls noch nicht gesetzt
   if (!GameState.heroPos && GameState.map.nodes.length) {
@@ -108,3 +108,15 @@ window.__startRun = (chosenTplIds) => {
 // -----------------------------
 showDraft(cards);
 render();
+
+// Spawner: stärkerer Held pro Runde (z.B. +15% HP je Runde)
+window.__spawnHero = () => {
+  const idx = (GameState.round - 1) % heroes.length;   // rotiert durch deine Heldenliste
+  const base = heroes[idx];
+  const factor = 1 + 0.15 * (GameState.round - 1);     // 15% stärker je Runde
+  const scaled = { ...base, maxHp: Math.round(base.maxHp * factor) };
+  GameState.hero = createHero(scaled);
+
+  const startNode = GameState.map?.nodes?.[0]?.id;
+  if (startNode) GameState.heroPos = startNode;
+};

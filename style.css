@@ -154,3 +154,12 @@ button:disabled{opacity:.5; cursor:not-allowed}
   margin-bottom: 8px;
   letter-spacing: 0.5px;
 }
+
+.toast{
+  position: fixed; left: 50%; top: 14px; transform: translateX(-50%) translateY(-10px);
+  opacity: 0; z-index: 10000;
+  background: #161427; border:1px solid rgba(255,255,255,.1); color:#e7e4f2;
+  border-radius:10px; padding:8px 12px; font-size:13px; box-shadow:0 10px 24px rgba(0,0,0,.45);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }

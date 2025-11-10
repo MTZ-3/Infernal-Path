@@ -76,13 +76,43 @@ export function endDay() {
     GameState.deck = shuffle(GameState.deck);
   }
 
-  // 5) Kill / Souls
+  // Held tot?
+  
   if (h.hp <= 0 && h.alive !== false) {
+    // Seelen gutschreiben
     h.alive = false;
     const gain = 3 + (GameState.runes?.soul ? 1 : 0);
     GameState.souls += gain;
-    window.__log?.(`<span class='soul'>Held fällt. +${gain} Seelen.</span>`);
-  }
+
+    // kurzer, nicht-blockierender Toast
+    window.__toast?.(`<b>SIEG</b> – Held gefallen (+${gain} Seelen)`);
+
+    // Runde hochzählen (nächste Heldenwelle)
+    GameState.round++;
+
+    // NÄCHSTER TAG beginnt gleich im Hintergrund:
+    GameState.day++;
+    if (GameState.day > GameState.maxDays) {
+      alert("Sieg!");            // oder dein Endscreen
+      freezeRun();
+      return;
+    }
+
+    // neuen (stärkeren) Helden am Start spawnen
+    if (typeof window.__spawnHero === "function") {
+      window.__spawnHero();
+    } else {
+      // Fallback
+      const startNode = GameState.map?.nodes?.[0]?.id ?? GameState.heroPos;
+      h.hp = h.maxHp; h.alive = true; h.dots = []; h.status = {};
+      if (startNode) GameState.heroPos = startNode;
+    }
+    renderMap?.();
+
+    // neues Ziehen & Energie für den neuen Tag
+    beginDay();
+    return;
+}
 
   // 6) Schloss erreicht? -> Niederlage
   if (h.alive !== false && GameState.heroPos === GameState.map.castleId) {
@@ -91,10 +121,10 @@ export function endDay() {
     return;
   }
 
-  // 7) Tag++ und Run-Ende prüfen
+  // Held lebt → normaler Tagwechsel
   GameState.day++;
   if (GameState.day > GameState.maxDays) {
-    alert(h.alive === false ? "Sieg!" : "Niederlage!");
+    alert("Niederlage!");        // oder Endscreen
     freezeRun();
     return;
   }
