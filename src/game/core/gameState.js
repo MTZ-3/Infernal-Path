@@ -5,23 +5,35 @@ export let RUN_DAYS = 10; // kann per Karte verlängert werden
 
 
 export const GameState = {
-day: 1,
-energy: BASE_ENERGY,
-souls: 0,
-drawPerDay: BASE_DRAW,
-hero: null,
-deck: [],
-discard: [],
-hand: [],
-runes: { draw:false, energy:false, soul:false },
-trapArmed:false,
-targeting:null,
-mods: { cursePct:0, tempDamagePct:0 },
-get maxDays(){ return RUN_DAYS; },
-extendDays(n){ RUN_DAYS += n; if(this.hero) this.hero.dist += n; }
+  // --- Run-Status ---
+  day: 1,
+  maxDays: 10,
+  energy: 0,
+  souls: 0,
+
+  // --- Deck/Hand/Ablage ---
+  deck: [],
+  hand: [],
+  discard: [],
+
+  // --- Held / Mods / Runen ---
+  hero: null,                                  // wird beim Run-Start gesetzt
+  runes: { draw:false, energy:false, soul:false },
+  mods: { cursePct:0, tempDamagePct:0 },
+
+  // --- Weltkarte & Platzierte Karten ---
+  map: { nodes: [], links: [], castleId: null }, // einfache Graph-Struktur
+  heroPos: null,                                  // ID des aktuellen Nodes
+  placed: new Map(),                               // Map<nodeId, Array<placedCard>>
+  // placedCard: { uid, id, name, once, cardRef, createdDay }
+
+  // --- Hilfsfunktion (z. B. bei "Run verlängern") ---
+  extendDays(d){ GameState.maxDays += d; },
 };
 
 
-export const clamp=(n,min,max)=>Math.max(min,Math.min(max,n));
-export const uid=()=>Math.random().toString(36).slice(2,9);
+
+// Kleine Helfer
+export const clamp = (v,min=0,max=9999)=>Math.max(min,Math.min(max,v));
+export const uid = ()=>Math.random().toString(36).slice(2);
 export const rand=(a,b)=>Math.floor(Math.random()*(b-a+1))+a;

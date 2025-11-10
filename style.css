@@ -42,3 +42,115 @@ button:disabled{opacity:.5; cursor:not-allowed}
 .link{stroke:#8b6f57; stroke-width:4}
 .demon{position:absolute; right:18px; top:18px; width:36px; height:36px; border-radius:50%; background:#2b2136; border:1px solid rgba(255,255,255,.1); display:grid; place-items:center; cursor:pointer}
 .demon:after{content:'🜏'}
+
+/* === DRAFT: Fullscreen + Multi-Row + Scroll === */
+#overlay.fullscreen { background: rgba(0,0,0,.96); }
+
+#overlay .inner.fullscreen{
+  background: transparent;
+  border: 0;
+  width: 100vw;
+  height: 100vh;           /* volle Höhe */
+  max-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;        /* Body-Scroll aus; nur Grid scrollt */
+}
+
+
+.log {
+  font-family: "Courier New", monospace;
+  background: radial-gradient(circle at 30% 20%, #18121f, #0a0810);
+  border: 1px solid rgba(255,255,255,0.06);
+  color: #a68df0;
+  text-shadow: 0 0 4px rgba(94,44,165,0.4);
+  box-shadow: 0 0 12px rgba(0,0,0,0.4) inset;
+}
+
+
+.draft-wrap{
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  overflow: hidden;        /* nur das Grid scrollt */
+}
+
+/* Anzahl Spalten steuern: kleiner = mehr Spalten */
+:root { --draft-card-min: 240px; }     /* ggf. 220–300 probieren */
+
+#draft-grid.draft-grid{
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--draft-card-min), 1fr));
+  grid-auto-rows: minmax(180px, auto);
+  gap: 16px;
+  align-content: start;
+  overflow: auto;          /* HIER wird gescrollt */
+  padding-bottom: 8px;
+}
+
+/* WICHTIG: Karten im Draft NICHT auf feste Breite nageln */
+#overlay .card.draft{
+  width: auto !important;
+  min-height: 190px;
+}
+
+/* === Element-Badges === */
+.elems{ margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+.elem{
+  font-size:11px; line-height:1; padding:4px 8px; border-radius:999px;
+  background:#241f32; border:1px solid rgba(255,255,255,.08);
+  text-transform:lowercase; letter-spacing:.02em; opacity:.95;
+}
+.elem.feuer   { background:#361c22; border-color:#af4242; }
+.elem.blut    { background:#2d1a25; border-color:#b01f4b; }
+.elem.schatten{ background:#191826; border-color:#6b5fc1; }
+.elem.eis     { background:#15232e; border-color:#3aa0d8; }
+.elem.natur   { background:#14281f; border-color:#3ca86d; }
+.elem.licht   { background:#2a2634; border-color:#c2b773; }
+
+
+/* === Hauptlayout für Spielfeld + Log === */
+#main-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;  /* Links flexibel, rechts fest */
+  gap: 16px;
+  height: calc(100vh - 100px);       /* passt sich Fensterhöhe an */
+  padding-right: 16px;
+}
+
+#left-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;                  /* Map & Karten scrollbar falls nötig */
+}
+
+#right-side {
+  display: flex;
+  flex-direction: column;
+}
+
+/* === Log-Styling === */
+.log {
+  flex: 1;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 13px;
+  color: var(--muted);
+  overflow-y: auto;
+}
+
+/* Optional: Titel oben im Log */
+.log::before {
+  content: "Chronik des Abgrunds";
+  display: block;
+  font-weight: 600;
+  color: #bda8ff;
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}

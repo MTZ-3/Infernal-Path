@@ -1,6 +1,11 @@
 import { GameState, BASE_ENERGY } from "../game/core/gameState.js";
 import { drawCards, sacrifice } from "../game/cards/cards.js";
-import { playCard } from "../game/cards/cards.js";
+import { playCard  } from "../game/cards/cards.js";
+
+function elementsHtml(arr){
+  if(!arr || !arr.length) return "";
+  return `<div class="elems">${arr.map(e=>`<span class="elem ${e}">${e}</span>`).join("")}</div>`;
+}
 
 let logBox;
 
@@ -15,15 +20,25 @@ export function mountUI(app) {
       <button id="btn-end-day">Tag beenden</button>
       <button id="btn-demon">👁 Dämon</button>
     </div>
-    <div id="map"></div>
-    <div id="runes"></div>
-    <div id="hand" class="hand"></div>
-    <div id="altar" class="altar">Opferaltar</div>
-    <div id="log" class="log"></div>
+
+    <div id="main-layout">
+      <div id="left-side">
+        <div id="map"></div>
+        <div id="runes"></div>
+        <div id="hand" class="hand"></div>
+        <div id="altar" class="altar">Opferaltar</div>
+      </div>
+
+      <div id="right-side">
+        <div id="log" class="log"></div>
+      </div>
+    </div>
+
     <div id="overlay"><div id="overlay-inner"></div></div>
   `;
   logBox = document.querySelector("#log");
 }
+
 
 // ----------------------------------------------------
 // ========== Log- & Renderfunktionen ==========
@@ -64,11 +79,14 @@ export function render() {
     const div = document.createElement("div");
     div.className = "card";
     div.draggable = true;
-    div.innerHTML = `<b>${card.name}</b><br>${card.desc}`;
-    div.onclick = () => {
-      s.targeting = card;
-      log(`Karte gewählt: ${card.name}`);
-    };
+    div.innerHTML = `
+      <div class="cost">${card.cost ?? 1}</div>
+      <div class="badge">${card.type}</div>
+      <div class="name">${card.name}</div>
+      <div class="desc small">${card.desc}</div>
+      ${elementsHtml(card.elements || [])}
+    `;
+    div.onclick = () => { s.targeting = card; log(`Karte gewählt: ${card.name}`); };
     hand.appendChild(div);
   });
 }
@@ -78,40 +96,73 @@ export function render() {
 // ----------------------------------------------------
 export function showDraft(cards) {
   const overlay = document.querySelector("#overlay");
-  const inner = document.querySelector("#overlay-inner");
+  const inner   = document.querySelector("#overlay-inner");
+
+  // Vollbild / Blackout aktivieren
+  document.body.classList.add("draft-active");
+  overlay.classList.add("fullscreen");
+  inner.classList.add("fullscreen");
+  document.documentElement.style.overflow = "";
   overlay.style.display = "flex";
 
-  let chosen = [];
-  inner.innerHTML = `
-    <h2>Kartenauswahl</h2>
-    <p>Wähle 10 Karten für deinen Run.</p>
-    <div id="draft-grid" class="grid"></div>
-    <button id="draft-done" disabled>Starten</button>
-  `;
-  const grid = inner.querySelector("#draft-grid");
+  const chosen = new Set();
 
-  cards.forEach((c) => {
-    const div = document.createElement("div");
-    div.className = "card";
-    div.innerHTML = `<b>${c.name}</b><br>${c.desc}`;
-    div.onclick = () => {
-      if (chosen.includes(c.id)) {
-        chosen = chosen.filter((x) => x !== c.id);
-        div.style.outline = "";
-      } else if (chosen.length < 10) {
-        chosen.push(c.id);
-        div.style.outline = "2px solid red";
-      }
-      inner.querySelector("#draft-done").disabled = chosen.length !== 10;
+  const draw = () => {
+    inner.innerHTML = `
+    <div class="draft-wrap">
+      <div class="draft-head">
+        <h2>Kartenauswahl</h2>
+        <div class="small muted">Wähle 10 Karten • <strong>${chosen.size}/10</strong></div>
+      </div>
+      <div id="draft-grid" class="draft-grid"></div>  <!-- <=== WICHTIG -->
+      <div class="draft-actions">
+        <button id="draft-cancel">Abbrechen</button>
+        <button id="draft-done" class="primary" ${chosen.size!==10 ? "disabled" : ""}>Run starten</button>
+      </div>
+    </div>
+    `;
+    const grid = inner.querySelector("#draft-grid");
+    cards.forEach(c => {
+      const card = document.createElement("div");
+      card.className = "card draft" + (chosen.has(c.id) ? " selected" : "");
+      card.innerHTML = `
+        <div class="cost">${c.cost ?? 1}</div>
+        <div class="badge">${c.type}</div>
+        <div class="name">${c.name}</div>
+        <div class="desc small">${c.desc}</div>`
+        + elementsHtml(c.elements || []);
+      card.onclick = () => {
+        if (chosen.has(c.id)) chosen.delete(c.id);
+        else if (chosen.size < 10) chosen.add(c.id);
+        draw(); // re-render Counter & Selection
+      };
+      grid.appendChild(card);
+    });
+
+    inner.querySelector("#draft-cancel").onclick = closeOverlayFullscreen;
+    inner.querySelector("#draft-done").onclick = () => {
+      if (chosen.size !== 10) return;
+      closeOverlayFullscreen();
+      window.__startRun(Array.from(chosen));
     };
-    grid.appendChild(div);
-  });
-
-  inner.querySelector("#draft-done").onclick = () => {
-    overlay.style.display = "none";
-    window.__startRun(chosen);
   };
+
+  draw();
 }
+
+
+// Overlay sauber schließen
+function closeOverlayFullscreen() {
+  const overlay = document.querySelector("#overlay");
+  const inner   = document.querySelector("#overlay-inner");
+  overlay.style.display = "none";
+  overlay.classList.remove("fullscreen");
+  inner.classList.remove("fullscreen");
+  // falls du woanders mal overflow gesperrt hast:
+  document.documentElement.style.overflow = "";
+}
+
+
 
 export function showPortalOffer(cards) {
   const overlay = document.querySelector("#overlay");
@@ -150,3 +201,5 @@ function shuffle(a) {
   }
   return arr;
 }
+
+
