@@ -1,184 +1,301 @@
+// ============================================================================
+// Karten-Engine (instanzbasiert)
+// ----------------------------------------------------------------------------
+// Grundidee:
+// - Es gibt VORLAGEN (Card-Templates) in einer Library (einmalig).
+// - Im Deck/Hand liegen INSTANZEN { uid, tplId, level }.
+// - Am Tagesbeginn werden 5 Instanzen zufällig gezogen.
+// - Beim Spielen/Platzieren verlässt die Instanz die Hand und
+//   geht (sofern nicht geopfert) sofort ZURÜCK INS DECK (gemischt).
+// - Nur "Opferung" entfernt eine Instanz dauerhaft.
+// ============================================================================
 
-import { GameState, clamp, uid } from "../core/gameState.js";
+import { GameState, uid, clamp } from "../core/gameState.js";
 
-export let CARD_LIBRARY = [];
-export function setCardLibrary(cards){ CARD_LIBRARY = cards; }
-export function sacrifice(fromCardUid, toCardUid){
-  // entferne Opferkarte aus Hand/Deck/Discard
-  const removeByUid = (arr, uid)=> {
-    const i = arr.findIndex(c=>c.uid===uid);
-    if(i>=0) arr.splice(i,1);
-  };
-  removeByUid(GameState.hand, fromCardUid);
-  removeByUid(GameState.deck, fromCardUid);
-  removeByUid(GameState.discard, fromCardUid);
+// ==============================
+// Library / Meta
+// ==============================
 
-  // finde Zielkarte irgendwo und level +1
-  const findByUid = (uid)=>(
-    GameState.hand.find(c=>c.uid===uid) ||
-    GameState.deck.find(c=>c.uid===uid) ||
-    GameState.discard.find(c=>c.uid===uid)
-  );
-  const target = findByUid(toCardUid);
-  if (target) {
-    target.level = (target.level||1) + 1;
-  }
-  return { ok: !!target };
+/** Interne Map: templates nach ID (tplId) für schnellen Lookup. */
+const TPL = new Map();
+
+/** Library aus deinen Karten-Vorlagen laden. */
+export function setCardLibrary(list) {
+  TPL.clear();
+  (list || []).forEach(t => TPL.set(t.id, t));
 }
 
-// --- Logging-Anschluss zur UI ---
-let _logCb=null;
-export function bindLogger(fn){ _logCb = fn; }
-const log = (m)=>_logCb?.(m);
+/** Vorlage holen (Fehler, falls nicht vorhanden). */
+function tplById(tplId) {
+  const t = TPL.get(tplId);
+  if (!t) throw new Error(`[cards] Unbekannte Vorlage: ${tplId}`);
+  return t;
+}
 
-// --- Skalierung (linear/log) pro Level ---
-export function scaledValue(card){
-  const lvl = card.level || 1;
-  const e = card.effect || {base:0,growth:0,scaleType:'linear'};
-  if(e.scaleType==='log'){
+// ==============================
+// Instanzen
+// ==============================
+
+/** Neue Karten-Instanz aus einer Vorlage erzeugen. */
+export function newInstance(tplId, level = 1) {
+  return { uid: uid(), tplId, level };
+}
+
+/** Praktisch für Rendering: Template + Instanz-Daten zusammenführen. */
+export function instView(inst) {
+  const t = tplById(inst.tplId);
+  return { ...t, uid: inst.uid, level: inst.level };
+}
+
+// ==============================
+// Skalierung (linear / log / cap)
+// ==============================
+
+/**
+ * Skaliert den Effektwert einer Karte anhand des Instanz-Levels.
+ * Nimmt entweder eine Instanz {tplId, level} ODER direkt ein Template-Objekt
+ * mit `effect` entgegen.
+ */
+export function scaledValue(cardOrInst) {
+  // Template ermitteln
+  const t = cardOrInst.tplId ? tplById(cardOrInst.tplId) : cardOrInst;
+  const level = (cardOrInst.level || 1);
+
+  const e = t.effect || { base: 0, growth: 0, scaleType: "linear" };
+  if (e.scaleType === "log") {
     const cap = e.cap ?? Infinity;
-    const val = e.base + Math.log1p(Math.max(0,lvl-1))*e.growth;
+    const val = e.base + Math.log1p(Math.max(0, level - 1)) * (e.growth || 0);
     return Math.min(val, cap);
   }
-  return e.base + (lvl-1)*e.growth; // linear
+  // linear
+  return (e.base || 0) + (level - 1) * (e.growth || 0);
 }
 
-// --- Ziehen/Reshuffle (für "draw_now" etc.) ---
-export function drawCards(n){
+// ==============================
+// Logging-Hook (UI)
+// ==============================
+
+let _logCb = null;
+export function bindLogger(fn) { _logCb = fn; }
+const log = (msg) => _logCb?.(msg);
+
+// ==============================
+// Ziehen / Mischen / Rotieren
+// ==============================
+
+/** Einfaches Fisher–Yates-Shuffle. */
+const shuffle = (a) => {
+  a = [...a];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+/** Zieht n Instanzen aus dem Deck (keine discard-Mechanik). */
+export function drawCards(n) {
   let drawn = 0;
-  for(let i=0; i<n; i++){
-    if (GameState.hand.length >= 7) break;        // Handlimit
-    if (GameState.deck.length === 0) {
-      reshuffleIfNeeded();
-      if (GameState.deck.length === 0) break;     // nichts mehr da
-    }
-    const card = GameState.deck.pop();            // vom Ende ziehen (Stack)
-    if (!card.uid) card.uid = uid();              // Safety: UID vergeben
-    GameState.hand.push(card);
+  for (let i = 0; i < n; i++) {
+    if (GameState.hand.length >= 20) break;      // Handlimit (anpassbar)
+    if (GameState.deck.length === 0) break;      // nichts mehr da
+    const inst = GameState.deck.pop();
+    GameState.hand.push(inst);
     drawn++;
   }
-  window.__log?.(`<span class="small muted">gezogen: ${drawn}</span>`);
+  log(`<span class="small muted">gezogen: ${drawn} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}</span>`);
 }
-export function reshuffleIfNeeded(){
-  if(GameState.deck.length===0 && GameState.discard.length>0){
-    GameState.deck = shuffle(GameState.discard); GameState.discard=[];
-    log(`Ablagestapel wird gemischt.`);
-  }
-}
-const shuffle=a=>{a=[...a]; for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a;};
 
-// ======================================================
-// Karte spielen —
-// 1) ohne targetNodeId = Sofort-Effekt (Damage/DoT/etc.)
-// 2) mit  targetNodeId = Karte wird AUF DEM FELD platziert
-// ======================================================
-export function playCard(card, targetNodeId=null){
-  const cost = card.cost ?? 0;
-  if(GameState.energy < cost) return { ok:false, log:`Nicht genug Energie` };
+/** Legt eine Instanz zurück ins Deck und mischt leicht. */
+export function returnToDeck(inst) {
+  GameState.deck.push(inst);
+  // leicht mischen – schnell & ausreichend für Prototyp
+  GameState.deck = shuffle(GameState.deck);
+}
+
+// ==============================
+// Opferung & Level-Up
+// ==============================
+
+/**
+ * Entfernt EINE Instanz endgültig (Opferung).
+ * @returns { ok: boolean }
+ */
+export function sacrificeByUid(cardUid) {
+  const remove = (arr) => {
+    const i = arr.findIndex(c => c.uid === cardUid);
+    if (i >= 0) arr.splice(i, 1);
+  };
+  remove(GameState.hand);
+  remove(GameState.deck);
+  remove(GameState.discard); // ungenutzt, aber harmless
+  return { ok: true };
+}
+
+/**
+ * Kompatibler Helfer: Opfer von A und Level-Up auf B.
+ * fromCardUid wird gelöscht; toCardUid +1 Level (falls vorhanden).
+ */
+export function sacrifice(fromCardUid, toCardUid) {
+  // 1) Opfer entfernen
+  sacrificeByUid(fromCardUid);
+
+  // 2) Ziel finden & leveln
+  const findByUid = (uid) =>
+    GameState.hand.find(c => c.uid === uid) ||
+    GameState.deck.find(c => c.uid === uid) ||
+    GameState.discard.find(c => c.uid === uid);
+
+  const target = findByUid(toCardUid);
+  if (target) {
+    target.level = (target.level || 1) + 1;
+    log(`<span class="k">Level-Up</span>: uid=${toCardUid} → L${target.level}`);
+    return { ok: true };
+  }
+  return { ok: false };
+}
+
+/** Reines Level-Up per uid (optional) */
+export function levelUp(cardUid, delta = 1) {
+  const all = [GameState.hand, GameState.deck, GameState.discard];
+  for (const arr of all) {
+    const c = arr.find(x => x.uid === cardUid);
+    if (c) { c.level = Math.max(1, (c.level || 1) + delta); return { ok: true, level: c.level }; }
+  }
+  return { ok: false };
+}
+
+// ==============================
+// Karte spielen / platzieren
+// ==============================
+
+/**
+ * Karte spielen.
+ * - ohne targetNodeId: Sofort-Effekt (wirkt direkt auf den Helden)
+ * - mit  targetNodeId: als „Falle/Zone“ auf der Map platzieren
+ * In beiden Fällen: Instanz verlässt Hand und geht zurück ins Deck (rotierendes Deck).
+ */
+export function playCard(inst, targetNodeId = null) {
+  // 1) Template holen & Kosten bezahlen
+  const t = inst.tplId ? tplById(inst.tplId) : inst; // Fail-safe: falls doch Template übergeben
+  const cost = t.cost ?? 0;
+  if (GameState.energy < cost) return { ok: false, log: `Nicht genug Energie` };
   GameState.energy -= cost;
 
-  if(targetNodeId){
-    placeOnNode(card, targetNodeId);                               // ← legt „Falle/Zone“ aufs Feld
-    GameState.discard.push(card);
-    GameState.hand = GameState.hand.filter(c=>c.uid!==card.uid);   // aus Hand entfernen
-    return { ok:true, log:`${card.name} wurde auf Feld platziert.` };
+  // 2) Platzieren auf Node
+  if (targetNodeId) {
+    placeOnNode(inst, targetNodeId);
+    // Instanz aus Hand nehmen & zurück ins Deck
+    GameState.hand = GameState.hand.filter(c => c.uid !== inst.uid);
+    returnToDeck(inst);
+    return { ok: true, log: `${t.name} wurde auf Feld platziert.` };
   }
 
-  // --- Sofort-Effekte: wirken direkt auf den Helden ---
+  // 3) Sofort-Effekt (vereinfacht, typisches Set an Effekten)
   const h = GameState.hero;
-  const val = Math.max(0, Math.floor(scaledValue(card)));
-  const k = card.effect?.kind;
+  const k = t.effect?.kind;
+  const val = Math.max(1, Math.floor(scaledValue(inst)));
 
-  if(k==='damage' || k==='aoe_damage'){
+  if (k === "damage" || k === "aoe_damage") {
     h.hp = clamp(h.hp - val, 0, h.maxHp);
-    log(`${card.name} trifft für ${val}.`);
-  } else if(k==='dot' || k==='bleed'){
-    h.dots.push({ dmg: Math.max(1,val), days:3 });
-    log(`${card.name} DoT ${Math.max(1,val)} für 3T.`);
-  } else if(k==='freeze_days'){
-    const d = Math.max(1, Math.round(scaledValue(card)));
-    h.status.frozenDays=(h.status.frozenDays||0)+d;
-    log(`${card.name}: Eingefroren ${d}T.`);
-  } else if(k==='slow_move_days'){
-    const d = Math.max(1, Math.round(scaledValue(card)));
-    h.status.slowDays=(h.status.slowDays||0)+d;
-    log(`${card.name}: Verlangsamung ${d}T.`);
-  } else if(k==='weaken'){
-    const d = Math.max(1, Math.round(scaledValue(card)));
-    h.status.weakenPct = clamp((h.status.weakenPct||0)+d, 0, 90);
-    log(`${card.name}: Schwächung +${d}%.`);
-  } else if(k==='reduce_maxhp'){
-    const d = Math.max(1, Math.round(scaledValue(card)));
-    h.maxHp=Math.max(1,h.maxHp-d); h.hp=Math.min(h.hp,h.maxHp);
-    log(`${card.name}: MaxHP -${d}.`);
-  } else if(k==='gain_energy'){
-    GameState.energy += Math.max(1, Math.round(scaledValue(card)));
-    log(`${card.name}: Energie +${Math.max(1, Math.round(scaledValue(card)))}.`);
-  } else if(k==='gain_souls'){
-    GameState.souls += Math.max(1, Math.round(scaledValue(card)));
-    log(`${card.name}: Seelen +${Math.max(1, Math.round(scaledValue(card)))}.`);
-  } else if(k==='draw_now'){
-    drawCards(Math.max(1, Math.round(scaledValue(card))));
+    log(`${t.name} trifft für ${val}.`);
+  } else if (k === "dot" || k === "bleed") {
+    h.dots.push({ dmg: val, days: 3 });
+    log(`${t.name} DoT ${val} für 3T.`);
+  } else if (k === "freeze_days") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    h.status.frozenDays = (h.status.frozenDays || 0) + d;
+    log(`${t.name}: Eingefroren ${d}T.`);
+  } else if (k === "slow_move_days") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    h.status.slowDays = (h.status.slowDays || 0) + d;
+    log(`${t.name}: Verlangsamung ${d}T.`);
+  } else if (k === "weaken") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    h.status.weakenPct = clamp((h.status.weakenPct || 0) + d, 0, 90);
+    log(`${t.name}: Schwächung +${d}%.`);
+  } else if (k === "reduce_maxhp") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    h.maxHp = Math.max(1, h.maxHp - d); h.hp = Math.min(h.hp, h.maxHp);
+    log(`${t.name}: MaxHP -${d}.`);
+  } else if (k === "gain_energy") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    GameState.energy += d;
+    log(`${t.name}: Energie +${d}.`);
+  } else if (k === "gain_souls") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    GameState.souls += d;
+    log(`${t.name}: Seelen +${d}.`);
+  } else if (k === "draw_now") {
+    const d = Math.max(1, Math.round(scaledValue(inst)));
+    drawCards(d);
   } else {
-    log(`${card.name} gespielt (Platzhalter-Effekt).`);
+    log(`${t.name} gespielt (Platzhalter-Effekt).`);
   }
 
-  // in Ablage verschieben
-  GameState.discard.push(card);
-  GameState.hand = GameState.hand.filter(c=>c.uid!==card.uid);
-  return { ok:true };
+  // 4) Instanz aus Hand & zurück ins Deck (rotierend)
+  GameState.hand = GameState.hand.filter(c => c.uid !== inst.uid);
+  returnToDeck(inst);
+  return { ok: true };
 }
 
-// Karte auf Feld legen (als „Falle/Zone“)
-function placeOnNode(card, nodeId){
+/** Karte/Instanz als „Falle/Zone“ auf Node legen (Snapshot für Field-Trigger). */
+export function placeOnNode(inst, nodeId) {
+  const t = tplById(inst.tplId);
   const list = GameState.placed.get(nodeId) || [];
   list.push({
-    uid: uid(),
-    id: card.id,
-    name: card.name,
-    once: true,              // einfache Falle: einmalig auslösen und verschwinden
-    cardRef: { ...card },    // Snapshot (Level, Effekte etc.)
+    uid: uid(),             // placement-id, NICHT die inst.uid!
+    instUid: inst.uid,      // referenz auf die Instanz (falls du später zurückfinden willst)
+    tplId: inst.tplId,      // Vorlage
+    level: inst.level,      // Level zum Zeitpunkt des Platzierens
+    once: true,             // einfache Falle: einmal auslösen → weg
     createdDay: GameState.day
   });
   GameState.placed.set(nodeId, list);
-  log(`Platziert: ${card.name} @ Node`);
+  log(`Platziert: ${t.name}`);
 }
 
-// Beim Betreten eines Feldes auslösen
-export function triggerNode(nodeId){
+// ==============================
+// Feld-Trigger
+// ==============================
+
+/** Löst alle platzierten Karten auf einem Node aus. */
+export function triggerNode(nodeId) {
   const entries = GameState.placed.get(nodeId);
-  if(!entries || !entries.length) return;
+  if (!entries || !entries.length) return;
 
   const h = GameState.hero;
-  let keep = [];
+  const keep = [];
 
-  entries.forEach(p=>{
-    const c = p.cardRef;
-    const e = c.effect?.kind;
-    const val = Math.max(1, Math.floor(scaledValue(c)));
+  entries.forEach(p => {
+    const t = tplById(p.tplId);
+    // temporäre "virtuelle" Instanz für die Berechnung (Level zum Platzierzeitpunkt)
+    const v = { tplId: p.tplId, level: p.level };
+    const k = t.effect?.kind;
+    const val = Math.max(1, Math.floor(scaledValue(v)));
 
-    if(e==="damage" || e==="aoe_damage"){
+    if (k === "damage" || k === "aoe_damage") {
       h.hp = clamp(h.hp - val, 0, h.maxHp);
-      log(`<b>Falle</b> ${c.name} trifft für ${val}.`);
-    } else if(e==="dot" || e==="bleed"){
-      h.dots.push({ dmg: val, days:3 });
-      log(`<b>Zone</b> ${c.name} – DoT ${val} für 3T.`);
-    } else if(e==="freeze_days" || e==="slow_move_days"){
-      const d = Math.max(1, Math.round(scaledValue(c)));
-      if(e==="freeze_days") h.status.frozenDays = (h.status.frozenDays||0) + d;
-      else h.status.slowDays = (h.status.slowDays||0) + d;
-      log(`<b>Kontrolle</b> ${c.name} – ${d}T.`);
+      log(`<b>Falle</b> ${t.name} trifft für ${val}.`);
+    } else if (k === "dot" || k === "bleed") {
+      h.dots.push({ dmg: val, days: 3 });
+      log(`<b>Zone</b> ${t.name} – DoT ${val} für 3T.`);
+    } else if (k === "freeze_days" || k === "slow_move_days") {
+      const d = Math.max(1, Math.round(scaledValue(v)));
+      if (k === "freeze_days") h.status.frozenDays = (h.status.frozenDays || 0) + d;
+      else h.status.slowDays = (h.status.slowDays || 0) + d;
+      log(`<b>Kontrolle</b> ${t.name} – ${d}T.`);
     } else {
-      // Fallback: wie Sofortkarte behandeln (ohne Kosten)
-      const energyBackup = GameState.energy;
+      // Fallback: „als Sofortkarte behandeln“ (selten nötig)
+      const backup = GameState.energy;
       GameState.energy = 999;
-      playCard({ ...c, cost:0 }, null);
-      GameState.energy = energyBackup;
+      playCard({ tplId: p.tplId, level: p.level }, null);
+      GameState.energy = backup;
     }
 
-    if(!p.once){ keep.push(p); }
+    if (!p.once) keep.push(p);
   });
 
-  if(keep.length) GameState.placed.set(nodeId, keep);
+  if (keep.length) GameState.placed.set(nodeId, keep);
   else GameState.placed.delete(nodeId);
 }

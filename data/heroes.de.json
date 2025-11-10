@@ -2,7 +2,7 @@
 {
 "id":"blutjaeger",
 "name":"Der Blutjäger",
-"maxHp":90,
+"maxHp":1,
 "baseSpeed":1,
 "passives":[{"id":"raserei","desc":"Bei 50% HP doppelte Bewegung."}]
 }

@@ -1,7 +1,13 @@
-import { GameState, BASE_ENERGY } from "../game/core/gameState.js";
-import { drawCards, sacrifice } from "../game/cards/cards.js";
-import { playCard  } from "../game/cards/cards.js";
+// ============================================================================
+// UI: Layout, Logs, Hand-Rendering, Draft & Portal
+// Dieses UI arbeitet mit dem INSTANZ-Modell (Deck/Hand enthalten Instanzen).
+// Templates (Name, Kosten, Elemente, Effekt) kommen aus der Card-Library.
+// ============================================================================
 
+import { GameState, BASE_ENERGY } from "../game/core/gameState.js";
+import { playCard, instView, newInstance } from "../game/cards/cards.js";
+
+// Kleine Helper: Element-Badges
 function elementsHtml(arr){
   if(!arr || !arr.length) return "";
   return `<div class="elems">${arr.map(e=>`<span class="elem ${e}">${e}</span>`).join("")}</div>`;
@@ -12,6 +18,7 @@ let logBox;
 // ----------------------------------------------------
 // ========== UI Setup ==========
 // ----------------------------------------------------
+// Baut die Grundstruktur (Topbar, zweispaltiges Layout, Overlay).
 export function mountUI(app) {
   app.innerHTML = `
     <div id="top-bar">
@@ -39,10 +46,10 @@ export function mountUI(app) {
   logBox = document.querySelector("#log");
 }
 
-
 // ----------------------------------------------------
 // ========== Log- & Renderfunktionen ==========
 // ----------------------------------------------------
+// Bindet globale Log/Render-Funktionen an window (für andere Module).
 export function bindLogs() {
   window.__log = (msg) => log(msg);
   window.__render = () => render();
@@ -56,6 +63,8 @@ function log(msg) {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
+// Zeichnet Stats + Hand.
+// WICHTIG: Hand enthält INSTANZEN → für Anzeige nutzen wir instView(inst)
 export function render() {
   const s = GameState;
   const stats = document.querySelector("#stats");
@@ -63,30 +72,38 @@ export function render() {
 
   const h = s.hero;
   const heroStatus = h
-    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – Distanz: ${h.dist} – ${h.alive ? "Lebt" : "Tot"}`
+    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${h.alive !== false ? "Lebt" : "Tot"}`
     : "kein Held";
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
     Energie: ${s.energy}/${BASE_ENERGY} |
     Seelen: ${s.souls} |
+    Hand: ${s.hand.length} |
+    Deck: ${s.deck.length} |
     ${heroStatus}
   `;
 
+  // Hand neu zeichnen (Instanzen!)
   const hand = document.querySelector("#hand");
   hand.innerHTML = "";
-  s.hand.forEach((card) => {
+  s.hand.forEach((inst) => {
+    const c = instView(inst); // {name, type, desc, elements, cost, level, ...}
     const div = document.createElement("div");
     div.className = "card";
     div.draggable = true;
     div.innerHTML = `
-      <div class="cost">${card.cost ?? 1}</div>
-      <div class="badge">${card.type}</div>
-      <div class="name">${card.name}</div>
-      <div class="desc small">${card.desc}</div>
-      ${elementsHtml(card.elements || [])}
+      <div class="cost">${c.cost ?? 1}</div>
+      <div class="badge">${c.type}</div>
+      <div class="name">${c.name} <span class="small muted">· L${inst.level||1}</span></div>
+      <div class="desc small">${c.desc}</div>
+      ${elementsHtml(c.elements || [])}
     `;
-    div.onclick = () => { s.targeting = card; log(`Karte gewählt: ${card.name}`); };
+    // Beim Klicken: diese INSTANZ als Target setzen
+    div.onclick = () => {
+      s.targeting = inst;
+      log(`Karte gewählt: ${c.name} (L${inst.level||1})`);
+    };
     hand.appendChild(div);
   });
 }
@@ -94,6 +111,7 @@ export function render() {
 // ----------------------------------------------------
 // ========== Overlays (Draft / Portal) ==========
 // ----------------------------------------------------
+// Draft: Zeigt Vorlagen (Templates). Beim Bestätigen ruft main.js -> __startRun(chosenTplIds)
 export function showDraft(cards) {
   const overlay = document.querySelector("#overlay");
   const inner   = document.querySelector("#overlay-inner");
@@ -105,7 +123,7 @@ export function showDraft(cards) {
   document.documentElement.style.overflow = "";
   overlay.style.display = "flex";
 
-  const chosen = new Set();
+  const chosen = new Set(); // enthält TEMPLATE-IDs
 
   const draw = () => {
     inner.innerHTML = `
@@ -114,7 +132,7 @@ export function showDraft(cards) {
         <h2>Kartenauswahl</h2>
         <div class="small muted">Wähle 10 Karten • <strong>${chosen.size}/10</strong></div>
       </div>
-      <div id="draft-grid" class="draft-grid"></div>  <!-- <=== WICHTIG -->
+      <div id="draft-grid" class="draft-grid"></div>
       <div class="draft-actions">
         <button id="draft-cancel">Abbrechen</button>
         <button id="draft-done" class="primary" ${chosen.size!==10 ? "disabled" : ""}>Run starten</button>
@@ -122,19 +140,22 @@ export function showDraft(cards) {
     </div>
     `;
     const grid = inner.querySelector("#draft-grid");
-    cards.forEach(c => {
+
+    // Kartenliste sind VORLAGEN (Templates), NICHT Instanzen
+    cards.forEach(tpl => {
       const card = document.createElement("div");
-      card.className = "card draft" + (chosen.has(c.id) ? " selected" : "");
+      card.className = "card draft" + (chosen.has(tpl.id) ? " selected" : "");
       card.innerHTML = `
-        <div class="cost">${c.cost ?? 1}</div>
-        <div class="badge">${c.type}</div>
-        <div class="name">${c.name}</div>
-        <div class="desc small">${c.desc}</div>`
-        + elementsHtml(c.elements || []);
+        <div class="cost">${tpl.cost ?? 1}</div>
+        <div class="badge">${tpl.type}</div>
+        <div class="name">${tpl.name}</div>
+        <div class="desc small">${tpl.desc}</div>
+        ${elementsHtml(tpl.elements || [])}
+      `;
       card.onclick = () => {
-        if (chosen.has(c.id)) chosen.delete(c.id);
-        else if (chosen.size < 10) chosen.add(c.id);
-        draw(); // re-render Counter & Selection
+        if (chosen.has(tpl.id)) chosen.delete(tpl.id);
+        else if (chosen.size < 10) chosen.add(tpl.id);
+        draw(); // Re-Render Counter & Selection
       };
       grid.appendChild(card);
     });
@@ -143,13 +164,13 @@ export function showDraft(cards) {
     inner.querySelector("#draft-done").onclick = () => {
       if (chosen.size !== 10) return;
       closeOverlayFullscreen();
+      // WICHTIG: Wir übergeben TEMPLATE-IDs. __startRun baut daraus Instanzen.
       window.__startRun(Array.from(chosen));
     };
   };
 
   draw();
 }
-
 
 // Overlay sauber schließen
 function closeOverlayFullscreen() {
@@ -158,40 +179,46 @@ function closeOverlayFullscreen() {
   overlay.style.display = "none";
   overlay.classList.remove("fullscreen");
   inner.classList.remove("fullscreen");
-  // falls du woanders mal overflow gesperrt hast:
   document.documentElement.style.overflow = "";
 }
 
-
-
+// Portal: 3 Vorlagen zur Wahl; Auswahl wird als INSTANZ in die Hand gelegt.
 export function showPortalOffer(cards) {
   const overlay = document.querySelector("#overlay");
   const inner = document.querySelector("#overlay-inner");
   overlay.style.display = "flex";
 
-  const picks = shuffle(cards).slice(0, 3);
+  const picks = shuffle(cards).slice(0, 3); // Vorlagen!
   inner.innerHTML = `
     <h2>Portal öffnet sich</h2>
     <p>Wähle 1 Karte.</p>
     <div id="portal-grid" class="grid"></div>
   `;
   const grid = inner.querySelector("#portal-grid");
-  picks.forEach((c) => {
+  picks.forEach((tpl) => {
     const div = document.createElement("div");
     div.className = "card";
-    div.innerHTML = `<b>${c.name}</b><br>${c.desc}`;
+    div.innerHTML = `
+      <div class="cost">${tpl.cost ?? 1}</div>
+      <div class="badge">${tpl.type}</div>
+      <div class="name">${tpl.name}</div>
+      <div class="desc small">${tpl.desc}</div>
+      ${elementsHtml(tpl.elements || [])}
+    `;
     div.onclick = () => {
-      GameState.hand.push({ ...c, uid: Math.random().toString(36).slice(2) });
+      // Auswahl als INSTANZ auf die Hand (oder ins Deck – je nach Design)
+      const inst = newInstance(tpl.id, 1);
+      GameState.hand.push(inst);
       overlay.style.display = "none";
-      window.__log(`Portal: ${c.name} gewählt.`);
-      window.__render();
+      window.__log?.(`Portal: ${tpl.name} erhalten.`);
+      window.__render?.();
     };
     grid.appendChild(div);
   });
 }
 
 // ----------------------------------------------------
-// Hilfsfunktionen
+// Hilfsfunktionen (nur für UI)
 // ----------------------------------------------------
 function shuffle(a) {
   const arr = [...a];
@@ -201,5 +228,3 @@ function shuffle(a) {
   }
   return arr;
 }
-
-
