@@ -19,7 +19,8 @@ export const GameState = {
   maxDays: RUN_DAYS,    // dynamisch erweiterbar (z. B. durch Karten)
   energy: 0,            // verfügbare Energie im aktuellen Tag
   souls: 0,             // Währung für Runen/Meta
-  round: 1,             // <— NEU: wie viele Helden besiegt (Start = 1)
+  round: 1,             // wie viele Helden besiegt (Start = 1)
+  campDays: 3,          // verbleibende „am Start bleiben“-Tage
 
   // --- Deck/Hand/Ablage ---
   // Deck/Hand: Arrays von INSTANZEN { uid, tplId, level }

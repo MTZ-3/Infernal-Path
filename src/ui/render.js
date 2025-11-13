@@ -127,65 +127,9 @@ export function render() {
 // ========== Overlays (Draft / Portal) ==========
 // ----------------------------------------------------
 // Draft: Zeigt Vorlagen (Templates). Beim Bestätigen ruft main.js -> __startRun(chosenTplIds)
-export function showDraft(cards) {
-  const overlay = document.querySelector("#overlay");
-  const inner   = document.querySelector("#overlay-inner");
 
-  // Vollbild / Blackout aktivieren
-  document.body.classList.add("draft-active");
-  overlay.classList.add("fullscreen");
-  inner.classList.add("fullscreen");
-  document.documentElement.style.overflow = "";
-  overlay.style.display = "flex";
 
-  const chosen = new Set(); // enthält TEMPLATE-IDs
 
-  const draw = () => {
-    inner.innerHTML = `
-    <div class="draft-wrap">
-      <div class="draft-head">
-        <h2>Kartenauswahl</h2>
-        <div class="small muted">Wähle 10 Karten • <strong>${chosen.size}/10</strong></div>
-      </div>
-      <div id="draft-grid" class="draft-grid"></div>
-      <div class="draft-actions">
-        <button id="draft-cancel">Abbrechen</button>
-        <button id="draft-done" class="primary" ${chosen.size!==10 ? "disabled" : ""}>Run starten</button>
-      </div>
-    </div>
-    `;
-    const grid = inner.querySelector("#draft-grid");
-
-    // Kartenliste sind VORLAGEN (Templates), NICHT Instanzen
-    cards.forEach(tpl => {
-      const card = document.createElement("div");
-      card.className = "card draft" + (chosen.has(tpl.id) ? " selected" : "");
-      card.innerHTML = `
-        <div class="cost">${tpl.cost ?? 1}</div>
-        <div class="badge">${tpl.type}</div>
-        <div class="name">${tpl.name}</div>
-        <div class="desc small">${tpl.desc}</div>
-        ${elementsHtml(tpl.elements || [])}
-      `;
-      card.onclick = () => {
-        if (chosen.has(tpl.id)) chosen.delete(tpl.id);
-        else if (chosen.size < 10) chosen.add(tpl.id);
-        draw(); // Re-Render Counter & Selection
-      };
-      grid.appendChild(card);
-    });
-
-    inner.querySelector("#draft-cancel").onclick = closeOverlayFullscreen;
-    inner.querySelector("#draft-done").onclick = () => {
-      if (chosen.size !== 10) return;
-      closeOverlayFullscreen();
-      // WICHTIG: Wir übergeben TEMPLATE-IDs. __startRun baut daraus Instanzen.
-      window.__startRun(Array.from(chosen));
-    };
-  };
-
-  draw();
-}
 
 // Overlay sauber schließen
 function closeOverlayFullscreen() {
@@ -196,6 +140,20 @@ function closeOverlayFullscreen() {
   inner.classList.remove("fullscreen");
   document.documentElement.style.overflow = "";
 }
+// Overlay öffnen/schließen — global verfügbar für Lobby, Draft, Portal etc.
+export function openOverlay(){
+  const ov = document.querySelector('#overlay');
+  ov?.classList.add('open');
+  ov && (ov.style.display = 'flex'); // optional doppelt-robust
+}
+export function closeOverlay(){
+  const ov = document.querySelector('#overlay');
+  const inner = document.querySelector('#overlay-inner');
+  ov?.classList.remove('open');
+  ov && (ov.style.display = 'none'); // optional
+  if(inner) inner.innerHTML = '';
+}
+
 
 // Portal: 3 Vorlagen zur Wahl; Auswahl wird als INSTANZ ins DECK gelegt
 // Level = aktuelle Runde (ab Runde 2 → Level 2, etc.)
@@ -271,4 +229,114 @@ function shuffle(a) {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+
+/**
+ * LOBBY / DECK-EDITOR
+ * - Spieler wählt exakt 10 Karten
+ * - Zufall / Leeren / Filter / Suche
+ * - Starten → __startRun(selectedIds)
+ */
+export function showLobby(allCards){
+  const ov = document.querySelector('#overlay');
+  const inner = document.querySelector('#overlay-inner');
+  openOverlay();
+
+  // Lokaler State
+  const selected = new Set();          // genau 10 ids
+  let q = "";                          // Suchstring
+  let filterType = "alle";             // Kartentyp-Filter
+
+  const TYPES = ["alle","fluch","kontrolle","daemon","ritual","eroberung","spezial"];
+
+  const draw = ()=>{
+    inner.innerHTML = `
+      <div class="lobby-wrap">
+        <div class="lobby-head">
+          <h2>Lobby – Deck auswählen (10 Karten)</h2>
+          <div class="lobby-tools">
+            <input id="lobby-search" placeholder="Suche..." style="padding:8px 10px;border-radius:10px;border:1px solid rgba(255,255,255,.08);background:#1b1626;color:var(--text)" />
+            <div id="lobby-types" class="types" style="display:flex;gap:6px"></div>
+            <span class="lobby-counter">${selected.size}/10</span>
+            <button id="btn-random10">Zufällige 10</button>
+            <button id="btn-clear">Leeren</button>
+            <button id="btn-start" class="primary" ${selected.size!==10?"disabled":""}>Run starten</button>
+            <button id="btn-close" class="warn">Schließen</button>
+          </div>
+        </div>
+        <div class="lobby-grid" id="lobby-grid"></div>
+      </div>
+    `;
+
+    // Filter-Pills
+    const typesEl = inner.querySelector('#lobby-types');
+    TYPES.forEach(t=>{
+      const b = document.createElement('button');
+      b.className = 'pill' + (filterType===t?' active':'');
+      b.textContent = t;
+      b.onclick = ()=>{ filterType=t; draw(); };
+      typesEl.appendChild(b);
+    });
+
+    // Suche
+    const search = inner.querySelector('#lobby-search');
+    search.value = q;
+    search.oninput = (e)=>{ q = e.target.value.toLowerCase(); renderGrid(); };
+
+    // Buttons
+    inner.querySelector('#btn-random10').onclick = ()=>{
+      selected.clear();
+      const shuffled = shuffle(allCards);
+      for(let i=0;i<shuffled.length && selected.size<10;i++){
+        selected.add(shuffled[i].id);
+      }
+      draw();
+    };
+    inner.querySelector('#btn-clear').onclick = ()=>{ selected.clear(); draw(); };
+    inner.querySelector('#btn-start').onclick = ()=>{
+      if(selected.size!==10) return;
+      closeOverlay();
+      window.__startRun?.(Array.from(selected));
+    };
+    inner.querySelector('#btn-close').onclick = closeOverlay;
+
+    // Grid rendern
+    renderGrid();
+  };
+
+  const renderGrid = ()=>{
+    const grid = inner.querySelector('#lobby-grid');
+    grid.innerHTML = "";
+
+    // Filter anwenden
+    const filtered = allCards.filter(c=>{
+      const tOk = (filterType==="alle") || (c.type===filterType);
+      const qOk = !q || (c.name?.toLowerCase().includes(q)) || (c.desc?.toLowerCase().includes(q)) || (c.id?.toLowerCase().includes(q));
+      return tOk && qOk;
+    });
+
+    filtered.forEach(c=>{
+      const div = document.createElement('div');
+      const sel = selected.has(c.id);
+      div.className = "card pick" + (sel?" selected":"");
+      div.innerHTML = `
+        <div class="cost">${c.cost ?? 1}</div>
+        <div class="badge">${c.type}</div>
+        <div class="name">${c.name}</div>
+        <div class="mini">${c.id}</div>
+        <div class="desc small">${c.desc}</div>
+        ${elementsHtml(c.elements || [])}
+      `;
+      div.onclick = ()=>{
+        if(sel){ selected.delete(c.id); }
+        else if(selected.size<10){ selected.add(c.id); }
+        // wenn schon 10: keine weiteren hinzufügen
+        draw();
+      };
+      grid.appendChild(div);
+    });
+  };
+
+  draw();
 }

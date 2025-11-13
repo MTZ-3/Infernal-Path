@@ -1,5 +1,5 @@
 import { GameState } from "./game/core/gameState.js";
-import { mountUI, render, bindLogs, showDraft, showPortalOffer } from "./ui/render.js";
+import { mountUI, render, bindLogs, showPortalOffer, showLobby } from "./ui/render.js";
 import { setCardLibrary, newInstance } from "./game/cards/cards.js"; // <-- newInstance wichtig!
 import { createHero } from "./game/hero/hero.js";
 import { beginDay, endDay } from "./game/core/turns.js";
@@ -51,17 +51,29 @@ mountStaticMap(document.querySelector('#map'));
 // -----------------------------
 // Buttons
 // -----------------------------
-document.querySelector('#btn-end-day').onclick = () => {
-  endDay();
-  showPortalOffer(cards); // zeigt 3 Template-Karten (Portal erzeugt Instanz auf Klick)
-  render();
-};
-document.querySelector('#btn-new-run').onclick  = () => { showDraft(cards); };
+
+
 document.querySelector('#btn-demon').onclick = () => {
   const html = `<h2>Runen-Shop</h2><div class='small muted'>Platzhalter</div>`;
   document.querySelector('#overlay-inner').innerHTML = html;
   document.querySelector('#overlay').style.display   = 'flex';
 };
+document.querySelector('#btn-new-run').onclick  = ()=>{ showLobby(cards); };
+// Button: Tag beenden
+document.querySelector('#btn-end-day').onclick = () => {
+  console.log("[UI] btn-end-day clicked");
+  try { endDay(); } catch (e) { console.error("[endDay crash]", e); }
+  try { render(); renderMap?.(); } catch (e) { console.error("[render crash]", e); }
+};
+document.querySelector('#btn-demon').onclick    = ()=>{
+  const html = `<h2>Runen-Shop</h2><div class='small muted'>Platzhalter</div>`;
+  document.querySelector('#overlay-inner').innerHTML=html;
+  document.querySelector('#overlay').classList.add('open');
+};
+
+// Boot (statt auto-Draft):
+showLobby(cards); // ← öffnet die Lobby beim Start
+render();
 
 // -----------------------------
 // Run-Start (vom Draft aufgerufen)
@@ -81,7 +93,19 @@ window.__startRun = (chosenTplIds) => {
   GameState.deck  = shuffle(instances);
 
   // Held setzen (einmal pro Run)
- window.__spawnHero();
+  window.__spawnHero = () => {
+    const idx = (GameState.round - 1) % heroes.length;
+    const base = heroes[idx];
+    const factor = 1 + 0.15 * (GameState.round - 1);
+    const scaled = { ...base, maxHp: Math.round(base.maxHp * factor) };
+
+    GameState.hero = createHero(scaled);
+
+    const startNode = GameState.map?.nodes?.[0]?.id;
+    if (startNode) GameState.heroPos = startNode;
+
+    GameState.campDays = 3; // <— NEU: die ersten 3 Tage bleibt der Held am Start
+  };
 
   // Startposition auf der Map (erster Node), falls noch nicht gesetzt
   if (!GameState.heroPos && GameState.map.nodes.length) {
@@ -106,7 +130,7 @@ window.__startRun = (chosenTplIds) => {
 // -----------------------------
 // Boot: Draft öffnen + erste Render
 // -----------------------------
-showDraft(cards);
+
 render();
 
 // Spawner: stärkerer Held pro Runde (z.B. +15% HP je Runde)
@@ -120,3 +144,4 @@ window.__spawnHero = () => {
   const startNode = GameState.map?.nodes?.[0]?.id;
   if (startNode) GameState.heroPos = startNode;
 };
+

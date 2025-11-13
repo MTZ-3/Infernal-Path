@@ -1,16 +1,21 @@
+// src/game/core/turns.js
 // ============================================================================
 // Tages-Logik: beginDay / endDay / Heldenbewegung
 // - beginDay: Energie auffüllen, Startkarten ziehen
-// - endDay: DoTs ticken lassen, Held bewegen, Hand ins Deck zurückmischen,
-//           Tag hochzählen, ggf. Run-Ende prüfen, nächsten Tag starten
+// - endDay : VERY SIMPLE VERSION
+//            • DoTs ticken
+//            • Held 1 Feld bewegen (falls möglich)
+//            • Hand ins Deck + mischen
+//            • Tag++
+//            • beginDay() für nächsten Tag
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW, HAND_LIMIT, clamp } from "./gameState.js";
-import { drawCards } from "../cards/cards.js";
+import { drawCards }   from "../cards/cards.js";
 import { triggerNode } from "../cards/cards.js";
-import { renderMap } from "../map/map.js";
+import { renderMap }   from "../map/map.js";
 
-// kleines lokales Shuffle – reicht für Tagesmischung
+// kleines lokales Shuffle – nur für Tagesmischung
 const shuffle = (a) => {
   a = [...a];
   for (let i = a.length - 1; i > 0; i--) {
@@ -24,33 +29,53 @@ const shuffle = (a) => {
 // beginDay: Energie setzen + Karten ziehen
 // ----------------------------------------------------------------------------
 export function beginDay() {
-  // 1) Energie
   const extraEnergy = GameState.runes?.energy ? 1 : 0;
   GameState.energy = BASE_ENERGY + extraEnergy;
 
-  // 2) Ziehen (Handlimit wird in drawCards respektiert)
   const extraDraw = GameState.runes?.draw ? 1 : 0;
   const drawCount = BASE_DRAW + extraDraw;
+
   drawCards(drawCount);
 
-  // 3) Debug/Info
   window.__log?.(
-    `<span class="small muted">beginDay → Energie=${GameState.energy}, Hand=${GameState.hand.length}, Deck=${GameState.deck.length}</span>`
+    `<span class="small muted">beginDay → Tag ${GameState.day} • Energie=${GameState.energy} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}</span>`
   );
+  // UI sicher aktualisieren
+  window.__render?.();
+  renderMap?.();
 }
 
 // ----------------------------------------------------------------------------
-// endDay: Status abhandeln, bewegen, Hand zurück, Tag++ (und ggf. nächster Tag)
+// endDay: sehr einfache, robuste Version
 // ----------------------------------------------------------------------------
 export function endDay() {
-  const h = GameState.hero;
-  if (!h) return;
+  console.log("[endDay] START", { day: GameState.day, hero: !!GameState.hero });
 
-  // Safety: Felder initialisieren, falls nicht vorhanden
+  // --- 0) Held sicherstellen ---
+  if (!GameState.hero) {
+    console.warn("[endDay] Kein Held → fallback spawn");
+    // Minimal-Spawn, falls du kein __spawnHero hast
+    if (typeof window.__spawnHero === "function") {
+      window.__spawnHero();
+    } else {
+      const startNode = GameState.map?.nodes?.[0];
+      GameState.hero = {
+        name: "Held",
+        maxHp: 90,
+        hp: 90,
+        dots: [],
+        status: {},
+        alive: true,
+      };
+      if (startNode) GameState.heroPos = startNode.id;
+    }
+  }
+
+  const h = GameState.hero;
   h.dots   = Array.isArray(h.dots) ? h.dots : [];
   h.status = h.status || {};
 
-  // 1) DoTs ticken lassen
+  // --- 1) DoTs ticken ---
   let dotTotal = 0;
   h.dots.forEach(d => { dotTotal += d.dmg; d.days--; });
   h.dots = h.dots.filter(d => d.days > 0);
@@ -59,110 +84,69 @@ export function endDay() {
     window.__log?.(`<span class="small muted">DoT: ${dotTotal} Schaden</span>`);
   }
 
-  // 2) Dauer-Effekte abbauen (nur Zähler runter; Logik kann später erweitert werden)
-  if (h.status.frozenDays > 0) h.status.frozenDays--;
-  if (h.status.slowDays   > 0) h.status.slowDays--;
-
-  // 3) Held bewegen (1 Node pro Tag), außer eingefroren oder tot
-  const frozenNow = (h.status.frozenDays ?? 0) > 0;
-  if (h.alive !== false && !frozenNow) {
+  // --- 2) Einfache Bewegung (wenn lebendig) ---
+  if (h.alive !== false && h.hp > 0) {
     moveHeroOneStep();
   }
 
-  // 4) Hand zurück ins Deck und mischen (rotierendes Deck)
+  // --- 3) Hand → Deck & mischen ---
   if (GameState.hand.length) {
     GameState.deck.push(...GameState.hand);
     GameState.hand = [];
     GameState.deck = shuffle(GameState.deck);
   }
 
-  // Held tot?
-  
-  if (h.hp <= 0 && h.alive !== false) {
-    // Seelen gutschreiben
+  // --- 4) Sehr simpler Tod-/Schloss-Check (KEINE Map-Neuerzeugung, KEIN Run-Ende) ---
+  if (h.hp <= 0) {
     h.alive = false;
     const gain = 3 + (GameState.runes?.soul ? 1 : 0);
     GameState.souls += gain;
-
-    // kurzer, nicht-blockierender Toast
-    window.__toast?.(`<b>SIEG</b> – Held gefallen (+${gain} Seelen)`);
-
-    // Runde hochzählen (nächste Heldenwelle)
-    GameState.round++;
-
-    // NÄCHSTER TAG beginnt gleich im Hintergrund:
-    GameState.day++;
-    if (GameState.day > GameState.maxDays) {
-      alert("Sieg!");            // oder dein Endscreen
-      freezeRun();
-      return;
-    }
-
-    // neuen (stärkeren) Helden am Start spawnen
-    if (typeof window.__spawnHero === "function") {
-      window.__spawnHero();
-    } else {
-      // Fallback
-      const startNode = GameState.map?.nodes?.[0]?.id ?? GameState.heroPos;
-      h.hp = h.maxHp; h.alive = true; h.dots = []; h.status = {};
-      if (startNode) GameState.heroPos = startNode;
-    }
-    renderMap?.();
-
-    // neues Ziehen & Energie für den neuen Tag
-    beginDay();
-    return;
-}
-
-  // 6) Schloss erreicht? -> Niederlage
-  if (h.alive !== false && GameState.heroPos === GameState.map.castleId) {
-    alert("Niederlage! Der Held erreichte das Schloss.");
-    freezeRun();
-    return;
+    window.__log?.(`<span class="soul">Held fällt. +${gain} Seelen.</span>`);
   }
 
-  // Held lebt → normaler Tagwechsel
+  // --- 5) Tag++ ---
   GameState.day++;
-  if (GameState.day > GameState.maxDays) {
-    alert("Niederlage!");        // oder Endscreen
-    freezeRun();
-    return;
-  }
 
-  // 8) Nächster Tag startet automatisch
+  // --- 6) Nächster Tag: Energie auffüllen & ziehen ---
   beginDay();
+
+  console.log("[endDay] DONE → Tag", GameState.day);
 }
 
 // ----------------------------------------------------------------------------
-// Bewegung: 1 Schritt Richtung Schloss (kürzeste Luftlinie)
+// Bewegung: Held 1 Schritt Richtung "rechts" / nächste Schicht, sehr simpel
 // ----------------------------------------------------------------------------
 function moveHeroOneStep() {
-  const here   = GameState.heroPos;
-  const target = GameState.map.castleId;
-  if (!here || !target || here === target) return;
+  const hereId = GameState.heroPos;
+  if (!hereId) return;
+  const hereNode = nodeById(hereId);
+  if (!hereNode) return;
 
-  const neigh = neighborsOf(here);
-  if (!neigh.length) return;
+  const neighIds = neighborsOf(hereId);
+  if (!neighIds.length) return;
 
-  // wähle Nachbar mit kleinster Luftlinie zur Burg
-  const castleNode = nodeById(target);
-  let best = neigh[0], bestD = dist(nodeById(neigh[0]), castleNode);
-  for (let i = 1; i < neigh.length; i++) {
-    const d = dist(nodeById(neigh[i]), castleNode);
-    if (d < bestD) { best = neigh[i]; bestD = d; }
-  }
+  // Versuch: Nachbarn mit höherem x (nach "rechts") bevorzugen
+  const hereX = hereNode.x;
+  const neighNodes = neighIds.map(id => nodeById(id)).filter(Boolean);
 
-  GameState.heroPos = best;
+  let candidates = neighNodes.filter(n => n.x > hereX + 1);
+  if (!candidates.length) candidates = neighNodes; // Fallback
 
-  // Feld-Effekte auslösen + Map neu zeichnen
-  triggerNode(best);
+  const next = candidates[0]; // super simpel: ersten Kandidaten nehmen
+  GameState.heroPos = next.id;
+
+  // Platzierte Karten auf dem Feld auslösen
+  try { triggerNode(next.id); } catch(e) { console.error("triggerNode fail", e); }
+
   renderMap?.();
 }
 
 // ----------------------------------------------------------------------------
-// kleine Graph-Helfer
+// Graph-Helfer
 // ----------------------------------------------------------------------------
-function nodeById(id) { return GameState.map.nodes.find(n => n.id === id); }
+function nodeById(id) {
+  return GameState.map.nodes.find(n => n.id === id);
+}
 function neighborsOf(id) {
   const out = [];
   GameState.map.links.forEach(l => {
@@ -170,15 +154,4 @@ function neighborsOf(id) {
     else if (l.b === id) out.push(l.a);
   });
   return out;
-}
-const dist = (A, B) => Math.hypot(A.x - B.x, A.y - B.y);
-
-// ----------------------------------------------------------------------------
-// Freeze: Run „einfrieren“ (bei Sieg/Niederlage); Deck/Hand leeren
-// ----------------------------------------------------------------------------
-function freezeRun() {
-  GameState.hand    = [];
-  GameState.deck    = [];
-  GameState.discard = [];
-  // Optional: Hier könntest du auch Buttons deaktivieren, Overlay zeigen etc.
 }

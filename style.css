@@ -163,3 +163,26 @@ button:disabled{opacity:.5; cursor:not-allowed}
   transition: opacity .15s ease, transform .15s ease;
 }
 .toast.show{ opacity: 1; transform: translateX(-50%) translateY(0); }
+
+
+
+/* Lobby / Deck-Editor */
+.lobby-wrap{display:flex;flex-direction:column;gap:14px; padding:16px;}
+.lobby-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.lobby-tools{display:flex;gap:8px; align-items:center; flex-wrap:wrap}
+.lobby-counter{font-weight:700}
+.lobby-grid{
+  display:grid; gap:12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  max-height: 64vh; overflow:auto; padding-right:4px;
+}
+.card.pick{position:relative; cursor:pointer; min-height:160px;}
+.card.pick.selected{outline:2px solid var(--accent2)}
+.card .mini{font-size:11px; color:var(--muted)}
+.pill{
+  font-size:12px; padding:6px 10px; border-radius:999px;
+  background:#231c31; border:1px solid rgba(255,255,255,.08); cursor:pointer
+}
+.pill.active{background:#39255f}
+#overlay{display:none; pointer-events:none; z-index:10000}
+#overlay.open{display:flex; pointer-events:auto}
