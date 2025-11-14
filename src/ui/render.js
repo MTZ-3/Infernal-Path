@@ -1,24 +1,36 @@
+// src/ui/render.js
 // ============================================================================
-// UI: Layout, Logs, Hand-Rendering, Draft & Portal
-// Dieses UI arbeitet mit dem INSTANZ-Modell (Deck/Hand enthalten Instanzen).
-// Templates (Name, Kosten, Elemente, Effekt) kommen aus der Card-Library.
+// UI für "Infernal Path"
+// - Layout: Topbar, Map links, Hand unten, Log rechts
+// - Logs & Toasts
+// - Hand-Rendering (INSTANZEN, nicht Templates!)
+// - Lobby (Deck-Auswahl 10 Karten)
+// - Portal (jeden Tag 3 Karten → 1 wählen → ins Deck, mischen, ziehen)
 // ============================================================================
 
-import { GameState, BASE_ENERGY } from "../game/core/gameState.js";
-import { playCard, instView, newInstance } from "../game/cards/cards.js";
+import { GameState, BASE_ENERGY, BASE_DRAW } from "../game/core/gameState.js";
+import {
+  playCard,
+  instView,
+  newInstance,
+  drawCards,
+  sacrifice,
+} from "../game/cards/cards.js";
+import { renderMap } from "../game/map/map.js";
 
-// Kleine Helper: Element-Badges
-function elementsHtml(arr){
-  if(!arr || !arr.length) return "";
-  return `<div class="elems">${arr.map(e=>`<span class="elem ${e}">${e}</span>`).join("")}</div>`;
+// Kleine Helper: Element-Badges für Karten
+function elementsHtml(arr) {
+  if (!arr || !arr.length) return "";
+  return `<div class="elems">${arr
+    .map((e) => `<span class="elem ${e}">${e}</span>`)
+    .join("")}</div>`;
 }
 
 let logBox;
 
-// ----------------------------------------------------
-// ========== UI Setup ==========
-// ----------------------------------------------------
-// Baut die Grundstruktur (Topbar, zweispaltiges Layout, Overlay).
+// ============================================================================
+// Grundlayout aufbauen
+// ============================================================================
 export function mountUI(app) {
   app.innerHTML = `
     <div id="top-bar">
@@ -46,27 +58,29 @@ export function mountUI(app) {
   logBox = document.querySelector("#log");
 }
 
-// ----------------------------------------------------
-// ========== Log- & Renderfunktionen ==========
-// ----------------------------------------------------
-// Bindet globale Log/Render-Funktionen an window (für andere Module).
+// ============================================================================
+// Logs, Render-Hooks, Toasts
+// ============================================================================
 export function bindLogs() {
+  // Normaler Log
   window.__log = (msg) => log(msg);
+
+  // Re-Render, aus anderen Modulen aufrufbar
   window.__render = () => render();
-  // Nicht-blockierende Kurzmeldung (~1s)
+
+  // Kleine Toasts (z.B. "SIEG", "Niederlage", "Tag 3")
   window.__toast = (html, ms = 1000) => {
     const t = document.createElement("div");
     t.className = "toast";
     t.innerHTML = html;
     document.body.appendChild(t);
-    // kleines Fade-in
+    // kleiner Fade-In
     requestAnimationFrame(() => t.classList.add("show"));
-    // Auto-hide
     setTimeout(() => {
       t.classList.remove("show");
       setTimeout(() => t.remove(), 200);
-  }, ms);
-};
+    }, ms);
+  };
 }
 
 function log(msg) {
@@ -77,8 +91,9 @@ function log(msg) {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-// Zeichnet Stats + Hand.
-// WICHTIG: Hand enthält INSTANZEN → für Anzeige nutzen wir instView(inst)
+// ============================================================================
+// Haupt-Renderfunktion: Stats + Hand (INSTANZEN!)
+// ============================================================================
 export function render() {
   const s = GameState;
   const stats = document.querySelector("#stats");
@@ -86,98 +101,89 @@ export function render() {
 
   const h = s.hero;
   const heroStatus = h
-    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${h.alive !== false ? "Lebt" : "Tot"}`
+    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${
+        h.alive !== false ? "Lebt" : "Tot"
+      }`
     : "kein Held";
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
-    <b>Runde ${s.round}</b> |
+    <b>Runde ${s.round ?? 1}</b> |
     Energie: ${s.energy}/${BASE_ENERGY} |
     Seelen: ${s.souls} |
     Hand: ${s.hand.length} |
     Deck: ${s.deck.length} |
     ${heroStatus}
-  `;
+ `;
 
-  // Hand neu zeichnen (Instanzen!)
+  // Hand zeichnen (INSTANZEN → instView)
   const hand = document.querySelector("#hand");
   hand.innerHTML = "";
   s.hand.forEach((inst) => {
-    const c = instView(inst); // {name, type, desc, elements, cost, level, ...}
+    const c = instView(inst); // { name, type, desc, elements, cost, ... }
+
     const div = document.createElement("div");
     div.className = "card";
     div.draggable = true;
     div.innerHTML = `
       <div class="cost">${c.cost ?? 1}</div>
       <div class="badge">${c.type}</div>
-      <div class="name">${c.name} <span class="small muted">· L${inst.level||1}</span></div>
+      <div class="name">${c.name} <span class="small muted">· L${
+      inst.level || 1
+    }</span></div>
       <div class="desc small">${c.desc}</div>
       ${elementsHtml(c.elements || [])}
     `;
-    // Beim Klicken: diese INSTANZ als Target setzen
     div.onclick = () => {
-      s.targeting = inst;
-      log(`Karte gewählt: ${c.name} (L${inst.level||1})`);
+      s.targeting = inst; // INSTANZ als Target
+      log(`Karte gewählt: ${c.name} (L${inst.level || 1})`);
     };
     hand.appendChild(div);
   });
 }
 
-// ----------------------------------------------------
-// ========== Overlays (Draft / Portal) ==========
-// ----------------------------------------------------
-// Draft: Zeigt Vorlagen (Templates). Beim Bestätigen ruft main.js -> __startRun(chosenTplIds)
+// ============================================================================
+// Overlay-Helfer (Lobby, Portal, Shop nutzen das gleiche Overlay)
+// ============================================================================
+export function openOverlay() {
+  const ov = document.querySelector("#overlay");
+  if (!ov) return;
+  ov.style.display = "flex";
+  ov.classList.add("open");
+}
 
+export function closeOverlay() {
+  const ov = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  if (ov) {
+    ov.style.display = "none";
+    ov.classList.remove("open");
+  }
+  if (inner) inner.innerHTML = "";
+}
 
-
-
-// Overlay sauber schließen
-function closeOverlayFullscreen() {
+// ============================================================================
+// PORTAL: Jeden Tag 3 Karten, 1 wählen → Instanz ins Deck → mischen → ziehen
+// ============================================================================
+// Wird von main.js via window.__portalDaily(drawCount) aufgerufen.
+export function showPortalOffer(cards, drawCount = BASE_DRAW) {
   const overlay = document.querySelector("#overlay");
-  const inner   = document.querySelector("#overlay-inner");
-  overlay.style.display = "none";
-  overlay.classList.remove("fullscreen");
-  inner.classList.remove("fullscreen");
-  document.documentElement.style.overflow = "";
-}
-// Overlay öffnen/schließen — global verfügbar für Lobby, Draft, Portal etc.
-export function openOverlay(){
-  const ov = document.querySelector('#overlay');
-  ov?.classList.add('open');
-  ov && (ov.style.display = 'flex'); // optional doppelt-robust
-}
-export function closeOverlay(){
-  const ov = document.querySelector('#overlay');
-  const inner = document.querySelector('#overlay-inner');
-  ov?.classList.remove('open');
-  ov && (ov.style.display = 'none'); // optional
-  if(inner) inner.innerHTML = '';
-}
+  const inner = document.querySelector("#overlay-inner");
+  if (!overlay || !inner) return;
 
+  openOverlay();
 
-// Portal: 3 Vorlagen zur Wahl; Auswahl wird als INSTANZ ins DECK gelegt
-// Level = aktuelle Runde (ab Runde 2 → Level 2, etc.)
-export function showPortalOffer(cards) {
-  const overlay = document.querySelector("#overlay");
-  const inner   = document.querySelector("#overlay-inner");
+  const round = GameState.round ?? 1;
+  const level = round >= 2 ? 2 : 1; // z.B. ab Runde 2 Level 2
 
-  // UI vorbereiten
-  inner.classList.remove("fullscreen");
-  overlay.classList.remove("fullscreen");
-  overlay.style.display = "flex";
-
-  const picks = shuffle(cards).slice(0, 3); // 3 zufällige TEMPLATES
+  const picks = shuffleArray(cards).slice(0, 3); // Template-Vorlagen
   inner.innerHTML = `
     <h2>Portal öffnet sich</h2>
-    <p>Wähle 1 Karte (Level ${Math.max(1, GameState.round || 1)}).</p>
+    <p>Wähle 1 Karte. Danach wird deine Tageshand gezogen.</p>
     <div id="portal-grid" class="grid"></div>
-    <div style="margin-top:10px; display:flex; justify-content:flex-end">
-      <button id="portal-cancel">Schließen</button>
-    </div>
   `;
 
   const grid = inner.querySelector("#portal-grid");
-  const lvl  = Math.max(1, GameState.round || 1); // ← Regel: Level = Runde
 
   picks.forEach((tpl) => {
     const div = document.createElement("div");
@@ -185,72 +191,64 @@ export function showPortalOffer(cards) {
     div.innerHTML = `
       <div class="cost">${tpl.cost ?? 1}</div>
       <div class="badge">${tpl.type}</div>
-      <div class="name">${tpl.name} <span class="small muted">· L${lvl}</span></div>
+      <div class="name">${tpl.name}</div>
       <div class="desc small">${tpl.desc}</div>
       ${elementsHtml(tpl.elements || [])}
     `;
+
     div.onclick = () => {
-      // Instanz bauen mit gewünschtem Level
-      const inst = newInstance(tpl.id, lvl);
+      try {
+        // 1) Instanz aus Template erzeugen (perfekt integriert mit deinem Card-System)
+        const inst = newInstance(tpl.id, level);
 
-      // Design-Entscheidung: INS DECK legen, leicht mischen, und 1 Karte nachziehen
-      GameState.deck.push(inst);
-      // leichtes Shuffle (lokal, ohne extra Import)
-      for (let i = GameState.deck.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [GameState.deck[i], GameState.deck[j]] = [GameState.deck[j], GameState.deck[i]];
+        // 2) Ins Deck legen
+        GameState.deck.push(inst);
+
+        // 3) Deck mischen
+        shuffleInPlace(GameState.deck);
+
+        // 4) Overlay schließen
+        closeOverlay();
+
+        // 5) Tageshand ziehen
+        drawCards(drawCount);
+
+        window.__log?.(
+          `<span class="small">Portal: ${tpl.name} (L${level}) ins Deck gelegt, Tageshand gezogen.</span>`
+        );
+        window.__render?.();
+        renderMap?.();
+      } catch (e) {
+        console.error("Portal-Klick-Fehler:", e);
+        window.__log?.(
+          `<span class="small soul">Portal-Fehler: ${e.message}</span>`
+        );
       }
-
-      // optional: sofort eine Karte ziehen (fühlt sich „rewarding“ an)
-      // Achtung: drawCards ist in cards.js – falls du hier ziehen willst, importiere es oben.
-      // import { drawCards } from "../game/cards/cards.js";
-      // drawCards(1);
-
-      overlay.style.display = "none";
-      window.__log?.(`Portal: ${tpl.name} (L${lvl}) erhalten.`);
-      window.__render?.();
     };
+
     grid.appendChild(div);
   });
-
-  // Schließen-Button & Klick auf Overlay-Hintergrund
-  inner.querySelector("#portal-cancel").onclick = () => (overlay.style.display = "none");
-  overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = "none"; };
 }
 
-
-// ----------------------------------------------------
-// Hilfsfunktionen (nur für UI)
-// ----------------------------------------------------
-function shuffle(a) {
-  const arr = [...a];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-
-/**
- * LOBBY / DECK-EDITOR
- * - Spieler wählt exakt 10 Karten
- * - Zufall / Leeren / Filter / Suche
- * - Starten → __startRun(selectedIds)
- */
-export function showLobby(allCards){
-  const ov = document.querySelector('#overlay');
-  const inner = document.querySelector('#overlay-inner');
+// ============================================================================
+// LOBBY / DECK-EDITOR
+// - Spieler wählt exakt 10 Karten (nach card.id, also Templates)
+// - "Zufällige 10", "Leeren", Filter nach Typ, Suche
+// - "Run starten" → window.__startRun(selectedIds)
+// ============================================================================
+export function showLobby(allCards) {
+  const ov = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
   openOverlay();
 
   // Lokaler State
-  const selected = new Set();          // genau 10 ids
-  let q = "";                          // Suchstring
-  let filterType = "alle";             // Kartentyp-Filter
+  const selected = new Set(); // genau 10 card.id
+  let q = ""; // Suche
+  let filterType = "alle";
 
-  const TYPES = ["alle","fluch","kontrolle","daemon","ritual","eroberung","spezial"];
+  const TYPES = ["alle", "fluch", "kontrolle", "daemon", "ritual", "eroberung", "spezial"];
 
-  const draw = ()=>{
+  const draw = () => {
     inner.innerHTML = `
       <div class="lobby-wrap">
         <div class="lobby-head">
@@ -261,7 +259,9 @@ export function showLobby(allCards){
             <span class="lobby-counter">${selected.size}/10</span>
             <button id="btn-random10">Zufällige 10</button>
             <button id="btn-clear">Leeren</button>
-            <button id="btn-start" class="primary" ${selected.size!==10?"disabled":""}>Run starten</button>
+            <button id="btn-start" class="primary" ${
+              selected.size !== 10 ? "disabled" : ""
+            }>Run starten</button>
             <button id="btn-close" class="warn">Schließen</button>
           </div>
         </div>
@@ -269,57 +269,72 @@ export function showLobby(allCards){
       </div>
     `;
 
-    // Filter-Pills
-    const typesEl = inner.querySelector('#lobby-types');
-    TYPES.forEach(t=>{
-      const b = document.createElement('button');
-      b.className = 'pill' + (filterType===t?' active':'');
+    // Typ-Filter-Pills
+    const typesEl = inner.querySelector("#lobby-types");
+    TYPES.forEach((t) => {
+      const b = document.createElement("button");
+      b.className = "pill" + (filterType === t ? " active" : "");
       b.textContent = t;
-      b.onclick = ()=>{ filterType=t; draw(); };
+      b.onclick = () => {
+        filterType = t;
+        draw();
+      };
       typesEl.appendChild(b);
     });
 
     // Suche
-    const search = inner.querySelector('#lobby-search');
+    const search = inner.querySelector("#lobby-search");
     search.value = q;
-    search.oninput = (e)=>{ q = e.target.value.toLowerCase(); renderGrid(); };
+    search.oninput = (e) => {
+      q = e.target.value.toLowerCase();
+      renderGrid();
+    };
 
     // Buttons
-    inner.querySelector('#btn-random10').onclick = ()=>{
+    inner.querySelector("#btn-random10").onclick = () => {
       selected.clear();
-      const shuffled = shuffle(allCards);
-      for(let i=0;i<shuffled.length && selected.size<10;i++){
+      const shuffled = shuffleArray(allCards);
+      for (let i = 0; i < shuffled.length && selected.size < 10; i++) {
         selected.add(shuffled[i].id);
       }
       draw();
     };
-    inner.querySelector('#btn-clear').onclick = ()=>{ selected.clear(); draw(); };
-    inner.querySelector('#btn-start').onclick = ()=>{
-      if(selected.size!==10) return;
-      closeOverlay();
-      window.__startRun?.(Array.from(selected));
-    };
-    inner.querySelector('#btn-close').onclick = closeOverlay;
 
-    // Grid rendern
+    inner.querySelector("#btn-clear").onclick = () => {
+      selected.clear();
+      draw();
+    };
+
+    inner.querySelector("#btn-start").onclick = () => {
+      if (selected.size !== 10) return;
+      closeOverlay();
+      window.__startRun?.(Array.from(selected)); // → main.js
+    };
+
+    inner.querySelector("#btn-close").onclick = closeOverlay;
+
+    // Karten-Grid rendern
     renderGrid();
   };
 
-  const renderGrid = ()=>{
-    const grid = inner.querySelector('#lobby-grid');
+  const renderGrid = () => {
+    const grid = inner.querySelector("#lobby-grid");
     grid.innerHTML = "";
 
-    // Filter anwenden
-    const filtered = allCards.filter(c=>{
-      const tOk = (filterType==="alle") || (c.type===filterType);
-      const qOk = !q || (c.name?.toLowerCase().includes(q)) || (c.desc?.toLowerCase().includes(q)) || (c.id?.toLowerCase().includes(q));
+    const filtered = allCards.filter((c) => {
+      const tOk = filterType === "alle" || c.type === filterType;
+      const qOk =
+        !q ||
+        c.name?.toLowerCase().includes(q) ||
+        c.desc?.toLowerCase().includes(q) ||
+        c.id?.toLowerCase().includes(q);
       return tOk && qOk;
     });
 
-    filtered.forEach(c=>{
-      const div = document.createElement('div');
+    filtered.forEach((c) => {
       const sel = selected.has(c.id);
-      div.className = "card pick" + (sel?" selected":"");
+      const div = document.createElement("div");
+      div.className = "card pick" + (sel ? " selected" : "");
       div.innerHTML = `
         <div class="cost">${c.cost ?? 1}</div>
         <div class="badge">${c.type}</div>
@@ -328,10 +343,12 @@ export function showLobby(allCards){
         <div class="desc small">${c.desc}</div>
         ${elementsHtml(c.elements || [])}
       `;
-      div.onclick = ()=>{
-        if(sel){ selected.delete(c.id); }
-        else if(selected.size<10){ selected.add(c.id); }
-        // wenn schon 10: keine weiteren hinzufügen
+      div.onclick = () => {
+        if (sel) {
+          selected.delete(c.id);
+        } else if (selected.size < 10) {
+          selected.add(c.id);
+        }
         draw();
       };
       grid.appendChild(div);
@@ -339,4 +356,25 @@ export function showLobby(allCards){
   };
 
   draw();
+}
+
+// ============================================================================
+// Lokale Utility-Funktionen
+// ============================================================================
+function shuffleArray(a) {
+  a = [...a];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// In-Place-Shuffle, z.B. fürs Deck
+function shuffleInPlace(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
 }
