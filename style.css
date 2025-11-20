@@ -185,4 +185,19 @@ button:disabled{opacity:.5; cursor:not-allowed}
 }
 .pill.active{background:#39255f}
 #overlay{display:none; pointer-events:none; z-index:10000}
-#overlay.open{display:flex; pointer-events:auto}
+#overlay.open{display:flex; pointer-events:auto} 
+
+/* === Target-Highlight auf der Map === */
+.node-ok {
+  stroke: #22c55e;           /* grün */
+  stroke-width: 3px;
+}
+
+.node-blocked {
+  opacity: 0.25;             /* ausgegraut */
+}
+
+.hero-dot.hero-ok {
+  filter: drop-shadow(0 0 6px #ff7575);
+  stroke: #ffaaaa;
+}

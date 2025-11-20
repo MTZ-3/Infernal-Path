@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { GameState, rand, uid } from "../core/gameState.js";
-import { playCard } from "../cards/cards.js";
+import { playCard, instView } from "../cards/cards.js";
 
 let _svg, _nodesG, _linksG, _heroDot;
 
@@ -70,7 +70,14 @@ export function regenerateMap(round = 1) {
     }
 
     const castleId = uid();
-    nodes.push({ id: castleId, layer: LAYERS - 1, x: colX[LAYERS - 1], y: rand(90, 170), kind: "castle", label: "Schloss" });
+    nodes.push({
+      id: castleId,
+      layer: LAYERS - 1,
+      x: colX[LAYERS - 1],
+      y: rand(90, 170),
+      kind: "castle",
+      label: "Schloss"
+    });
 
     const byLayer = (l) => nodes.filter(n => n.layer === l);
 
@@ -94,7 +101,10 @@ export function regenerateMap(round = 1) {
         if (!L.length) continue;
         if (Math.random() < 0.65) {
           const n = L[rand(0, L.length - 1)];
-          if (!n.kind) { n.kind = (Math.random() < 0.5) ? "village" : "dungeon"; specials++; }
+          if (!n.kind) {
+            n.kind = (Math.random() < 0.5) ? "village" : "dungeon";
+            specials++;
+          }
         }
       }
 
@@ -133,6 +143,8 @@ export function regenerateMap(round = 1) {
 }
 
 // ---------------------------------------------------------------------------
+// RENDER
+// ---------------------------------------------------------------------------
 export function renderMap() {
   if (!_svg) return;
 
@@ -141,50 +153,118 @@ export function renderMap() {
   GameState.map.links.forEach(l => {
     const A = nodeById(l.a), B = nodeById(l.b);
     if (!A || !B) return;
-    _linksG.appendChild(svgElem("line", { x1: A.x, y1: A.y, x2: B.x, y2: B.y, class: "link" }));
+    _linksG.appendChild(
+      svgElem("line", {
+        x1: A.x, y1: A.y,
+        x2: B.x, y2: B.y,
+        class: "link"
+      })
+    );
   });
 
   // Knoten
   _nodesG.innerHTML = "";
+  const selectedInst  = GameState.targeting || null;
+  const selectedPlace = selectedInst ? placementForInst(selectedInst) : null;
+
   GameState.map.nodes.forEach(n => {
-    const r = n.id === GameState.map.castleId ? 12 : 10;
-    const circle = svgElem("circle", { cx: n.x, cy: n.y, r, class: "node" });
-    circle.setAttribute("fill", kindFill(n.kind));
-    circle.addEventListener("click", () => onNodeClick(n));
-    _nodesG.appendChild(circle);
+    const g = svgElem("g");
 
-    if (n.kind === "village") _nodesG.appendChild(svgText(n.x, n.y - 16, "🏚"));
-    if (n.kind === "dungeon") _nodesG.appendChild(svgText(n.x, n.y - 16, "⌖"));
-    if (n.kind === "castle")  _nodesG.appendChild(svgText(n.x, n.y - 18, "🏰"));
-    if (n.label && n.kind !== "castle") _nodesG.appendChild(svgSmall(n.x, n.y + 18, n.label));
+    let cls = "node";
 
-    const cnt = (GameState.placed.get(n.id) || []).length;
-    if (cnt > 0) _nodesG.appendChild(svgSmall(n.x, n.y + 30, `×${cnt}`));
+    // Nur für Map-Karten (special/road) highlighten; Heldenkarten lassen Map normal.
+    if (selectedInst && selectedPlace !== "hero") {
+      if (isNodeValidForInst(n, selectedInst)) {
+        cls += " node-ok";
+      } else {
+        cls += " node-blocked";
+      }
+    }
+
+    const base = svgElem("circle", {
+      cx: n.x,
+      cy: n.y,
+      r: 14,
+      class: cls
+    });
+
+    base.setAttribute("fill", kindFill(n.kind));
+    base.addEventListener("click", () => onNodeClick(n));
+    g.appendChild(base);
+
+    if (n.kind === "village") g.appendChild(svgText(n.x, n.y - 20, "🏚"));
+    if (n.kind === "dungeon") g.appendChild(svgText(n.x, n.y - 20, "⌖"));
+    if (n.kind === "castle")  g.appendChild(svgText(n.x, n.y - 22, "🏰"));
+
+    const count = (GameState.placed.get(n.id) || []).length;
+    if (count > 0) g.appendChild(svgText(n.x, n.y + 28, `×${count}`));
+
+    _nodesG.appendChild(g);
   });
 
   // Heldmarker
   if (!_heroDot) {
-    _heroDot = svgElem("circle", { r: 6, fill: "#f87171", stroke: "#fff", "stroke-width": 2 });
+    _heroDot = svgElem("circle", {
+      r: 6,
+      fill: "#f87171",
+      stroke: "#fff",
+      "stroke-width": 2
+    });
     _svg.appendChild(_heroDot);
   }
   const H = nodeById(GameState.heroPos);
-  if (H) { _heroDot.setAttribute("cx", H.x); _heroDot.setAttribute("cy", H.y); }
+  if (H) {
+    _heroDot.setAttribute("cx", H.x);
+    _heroDot.setAttribute("cy", H.y);
+  }
 }
 
 // ===========================================================================
 // Interaktion: Karte auf Node platzieren
-// ===========================================================================
-function onNodeClick(n) {
-  const c = GameState.targeting;
-  if (!c) return;
-  const res = playCard(c, n.id);
-  if (res?.ok) { pulse(n.x, n.y); window.__render?.(); renderMap(); }
-  else { window.__log?.(res?.log || "Konnte hier nicht platzieren."); }
+// =========================================================================== */
+function onNodeClick(n){
+  const inst = GameState.targeting;
+  if (!inst) return; // keine Karte ausgewählt
+
+  const place = placementForInst(inst);
+
+  // 1) Helden-Karte auf Map? → verboten
+  if (place === "hero") {
+    window.__log?.("Diese Karte kannst du nur direkt auf den Helden wirken.");
+    return;
+  }
+
+  // 2) Dorf/Dungeon-Karten nur auf Dörfer/Dungeons
+  if (place === "special") {
+    if (n.kind !== "village" && n.kind !== "dungeon") {
+      window.__log?.("Diese Karte kannst du nur auf Dörfer oder Dungeons legen.");
+      return;
+    }
+  }
+
+  // 3) Fallen/Zonen nur auf Straßen / Start
+  if (place === "road") {
+    if (n.kind !== "road" && n.kind !== "start") {
+      window.__log?.("Diese Karte kannst du nur auf freie Wegfelder legen.");
+      return;
+    }
+  }
+
+  // 4) Wenn wir hier sind: Platzierung erlaubt
+  const res = playCard(inst, n.id);
+  if (res?.ok) {
+    GameState.targeting = null;  // Auswahl löschen
+    pulse(n.x, n.y);
+    window.__render?.();
+    renderMap?.();
+  } else {
+    window.__log?.(res?.log || "Konnte hier nicht platzieren.");
+  }
 }
 
 // ===========================================================================
 // Export: Vorwärts-Nachbarn (für 50/50 Bewegung in turns.js)
-// ===========================================================================
+// =========================================================================== */
 export function forwardNeighbors(id) {
   const here = nodeById(id);
   if (!here) return [];
@@ -199,20 +279,120 @@ export function forwardNeighbors(id) {
 }
 
 // ===========================================================================
-// Helpers
+// Helpers: Platzierung, Graph, SVG, Layout
 // ===========================================================================
+
+// Platzierungs-Typ für eine Karten-INSTANZ
+// Rückgabe: "hero" | "special" | "road"
+function placementForInst(inst) {
+  const v    = instView(inst);           // Template-View
+  const type = v.type;
+  const kind = v.effect?.kind || "";
+
+  // Eroberung = Karten für die Map
+  if (type === "eroberung") {
+    // Speziell: Dorf-/Dungeon-Karten
+    if (kind.includes("village") || kind.startsWith("dungeon_")) {
+      return "special";                  // nur Dorf/Dungeon
+    }
+    return "road";                       // sonst: Wege / Kreuzungen
+  }
+
+  // alles andere = direkt auf den Helden
+  return "hero";
+}
+
+// Prüft, ob ein Node zur ausgewählten Karte passt
+function isNodeValidForInst(node, inst) {
+  const place = placementForInst(inst);
+
+  if (place === "hero") {
+    // Heldenkarten gehören NICHT auf die Map
+    return false;
+  }
+  if (place === "special") {
+    return node.kind === "village" || node.kind === "dungeon";
+  }
+  if (place === "road") {
+    return node.kind === "road" || node.kind === "start";
+  }
+  return false;
+}
+
 function nodeById(id){ return GameState.map.nodes.find(n=>n.id===id); }
 
-function svgElem(tag, attrs={}){ const e=document.createElementNS("http://www.w3.org/2000/svg",tag); for(const k in attrs) e.setAttribute(k, attrs[k]); return e; }
-function svgText(x,y,txt){ const t=svgElem("text",{x,y,"text-anchor":"middle","dominant-baseline":"middle",fill:"#cbd5e1","font-size":"14px"}); t.textContent=txt; return t; }
-function svgSmall(x,y,txt){ const t=svgElem("text",{x,y,"text-anchor":"middle","dominant-baseline":"middle",fill:"#a7a3be","font-size":"10px"}); t.textContent=txt; return t; }
-function kindFill(kind){ if(kind==="village")return"#25321a"; if(kind==="dungeon")return"#2b1f33"; if(kind==="castle")return"#2a243a"; if(kind==="start")return"#1a1e2a"; return"#0b0b12"; }
-function pulse(x,y){ const p=svgElem("circle",{cx:x,cy:y,r:4,fill:"none",stroke:"#eab308","stroke-width":2,opacity:1}); _svg.appendChild(p); const t0=performance.now(); const tick=(t)=>{ const k=Math.min(1,(t-t0)/400); p.setAttribute("r",String(4+20*k)); p.setAttribute("opacity",String(1-k)); if(k<1) requestAnimationFrame(tick); else p.remove(); }; requestAnimationFrame(tick); }
-function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function svgElem(tag, attrs={}) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg",tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  return e;
+}
+function svgText(x,y,txt){
+  const t = svgElem("text",{
+    x,y,
+    "text-anchor":"middle",
+    "dominant-baseline":"middle",
+    fill:"#cbd5e1",
+    "font-size":"14px"
+  });
+  t.textContent = txt;
+  return t;
+}
+function svgSmall(x,y,txt){
+  const t = svgElem("text",{
+    x,y,
+    "text-anchor":"middle",
+    "dominant-baseline":"middle",
+    fill:"#a7a3be",
+    "font-size":"10px"
+  });
+  t.textContent = txt;
+  return t;
+}
+function kindFill(kind){
+  if(kind==="village") return "#25321a";
+  if(kind==="dungeon") return "#2b1f33";
+  if(kind==="castle")  return "#2a243a";
+  if(kind==="start")   return "#1a1e2a";
+  return "#0b0b12";
+}
+function pulse(x,y){
+  const p = svgElem("circle",{
+    cx:x, cy:y,
+    r:4,
+    fill:"none",
+    stroke:"#eab308",
+    "stroke-width":2,
+    opacity:1
+  });
+  _svg.appendChild(p);
+  const t0 = performance.now();
+  const tick = (t)=>{
+    const k = Math.min(1,(t-t0)/400);
+    p.setAttribute("r", String(4+20*k));
+    p.setAttribute("opacity", String(1-k));
+    if(k<1) requestAnimationFrame(tick); else p.remove();
+  };
+  requestAnimationFrame(tick);
+}
+function shuffle(a){
+  a=[...a];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
 function placeNonOverlappingYs(count,minY,maxY,gap){
   const ys=[]; let tries=0;
-  while(ys.length<count && tries<200){ tries++; const y=rand(minY,maxY); if(ys.every(v=>Math.abs(v-y)>=gap)) ys.push(y); }
-  if(ys.length<count){ const step=(maxY-minY)/(count+1); return Array.from({length:count},(_,i)=>Math.round(minY+step*(i+1))); }
+  while(ys.length<count && tries<200){
+    tries++;
+    const y=rand(minY,maxY);
+    if(ys.every(v=>Math.abs(v-y)>=gap)) ys.push(y);
+  }
+  if(ys.length<count){
+    const step=(maxY-minY)/(count+1);
+    return Array.from({length:count},(_,i)=>Math.round(minY+step*(i+1)));
+  }
   return ys.sort((a,b)=>a-b);
 }
 
@@ -328,7 +508,7 @@ function buildLayerEdges(A, B, opts){
 // VALIDATOR: prüft strikte Regeln & Pfad-Existenz (Start→Castle)
 // ---------------------------------------------------------------------------
 function validateGraph(nodes, links, LAYERS, startId, castleId, maxJunctions) {
-  const byId = new Map(nodes.map(n => [n.id, n]));
+  const byId   = new Map(nodes.map(n => [n.id, n]));
   const indeg  = new Map(nodes.map(n => [n.id, 0]));
   const outdeg = new Map(nodes.map(n => [n.id, 0]));
 
@@ -362,21 +542,31 @@ function validateGraph(nodes, links, LAYERS, startId, castleId, maxJunctions) {
   const q = [startId];
   while (q.length) {
     const v = q.shift();
-    for (const w of forwardAdj.get(v)) if (!reachFromStart.has(w)) { reachFromStart.add(w); q.push(w); }
+    for (const w of forwardAdj.get(v)) {
+      if (!reachFromStart.has(w)) {
+        reachFromStart.add(w);
+        q.push(w);
+      }
+    }
   }
   if (!reachFromStart.has(castleId)) return false;
 
-  // Castle-Erreichbarkeit (reverse BFS): kann Castle erreicht werden?
+  // Castle-Erreichbarkeit (reverse BFS)
   const reverseAdj = new Map(nodes.map(n => [n.id, []]));
   links.forEach(L => reverseAdj.get(L.b).push(L.a));
   const canReachCastle = new Set([castleId]);
   const q2 = [castleId];
   while (q2.length) {
     const v = q2.shift();
-    for (const w of reverseAdj.get(v)) if (!canReachCastle.has(w)) { canReachCastle.add(w); q2.push(w); }
+    for (const w of reverseAdj.get(v)) {
+      if (!canReachCastle.has(w)) {
+        canReachCastle.add(w);
+        q2.push(w);
+      }
+    }
   }
 
-  // Jeder Node muss auf einem Start→Castle-Pfad liegen (beides wahr)
+  // Jeder Node muss auf einem Start→Castle-Pfad liegen
   for (const n of nodes) {
     if (!reachFromStart.has(n.id)) return false;
     if (!canReachCastle.has(n.id)) return false;

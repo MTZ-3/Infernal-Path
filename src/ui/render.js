@@ -9,13 +9,7 @@
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW } from "../game/core/gameState.js";
-import {
-  playCard,
-  instView,
-  newInstance,
-  drawCards,
-  sacrifice,
-} from "../game/cards/cards.js";
+import { playCard, instView, newInstance, drawCards, sacrifice} from "../game/cards/cards.js";
 import { renderMap } from "../game/map/map.js";
 
 // Kleine Helper: Element-Badges für Karten
@@ -27,6 +21,22 @@ function elementsHtml(arr) {
 }
 
 let logBox;
+
+// Platzierungs-Typ basierend auf der TEMPLATE-View
+// Rückgabe: "hero" | "special" | "road"
+function placementForView(v) {
+  const type = v.type;
+  const kind = v.effect?.kind || "";
+
+  if (type === "eroberung") {
+    if (kind.includes("village") || kind.startsWith("dungeon_")) {
+      return "special";
+    }
+    return "road";
+  }
+  return "hero";
+}
+
 
 // ============================================================================
 // Grundlayout aufbauen
@@ -126,20 +136,27 @@ export function render() {
     div.className = "card";
     div.draggable = true;
     div.innerHTML = `
-      <div class="cost">${c.cost ?? 1}</div>
-      <div class="badge">${c.type}</div>
-      <div class="name">${c.name} <span class="small muted">· L${
-      inst.level || 1
-    }</span></div>
-      <div class="desc small">${c.desc}</div>
-      ${elementsHtml(c.elements || [])}
-    `;
+        <div class="cost">L${inst.level || 1}</div>
+        <div class="badge">${c.type}</div>
+        <div class="name">${c.name}</div>
+        <div class="desc small">${c.desc}</div>
+        ${elementsHtml(c.elements || [])}
+      `;
     div.onclick = () => {
-      s.targeting = inst; // INSTANZ als Target
-      log(`Karte gewählt: ${c.name} (L${inst.level || 1})`);
+    if (s.targeting === inst) {
+      // Nochmal draufklicken = abwählen
+      s.targeting = null;
+      log(`Auswahl aufgehoben.`);
+      } else {
+        s.targeting = inst;
+        log(`Karte gewählt: ${c.name} (L${inst.level || 1})`);
+      }
+      renderMap?.();
     };
+
     hand.appendChild(div);
   });
+
 }
 
 // ============================================================================
@@ -174,7 +191,7 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
   openOverlay();
 
   const round = GameState.round ?? 1;
-  const level = round >= 2 ? 2 : 1; // z.B. ab Runde 2 Level 2
+  const level = round;
 
   const picks = shuffleArray(cards).slice(0, 3); // Template-Vorlagen
   inner.innerHTML = `
@@ -189,7 +206,7 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
-      <div class="cost">${tpl.cost ?? 1}</div>
+      <div class="cost">L${level}</div>
       <div class="badge">${tpl.type}</div>
       <div class="name">${tpl.name}</div>
       <div class="desc small">${tpl.desc}</div>
