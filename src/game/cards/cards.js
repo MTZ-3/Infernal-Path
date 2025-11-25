@@ -12,6 +12,31 @@
 
 import { GameState, uid, clamp } from "../core/gameState.js";
 
+function elementalFactorFor(hero, element) {
+  if (!hero || !element) return 1;
+  let f = 1;
+  if (hero.weakElement && hero.weakElement === element)   f *= 2;   // schwach → doppelter Schaden
+  if (hero.strongElement && hero.strongElement === element) f *= 0.5; // stark → halber Schaden
+  return f;
+}
+
+function computeElementalDamage(base, element) {
+  const h = GameState.hero;
+  const factor = elementalFactorFor(h, element);
+  return Math.max(0, Math.round(base * factor));
+}
+
+function logElementHit(label, base, final, element) {
+  const elemTxt = element ? ` (${element})` : "";
+  if (final === base) {
+    log(`${label}: ${final} Schaden${elemTxt}.`);
+  } else {
+    log(`${label}: ${base}→${final} Schaden${elemTxt}.`);
+  }
+}
+
+
+
 // ==============================
 // Library / Meta
 // ==============================
@@ -208,11 +233,14 @@ export function playCard(inst, targetNodeId = null) {
   const val = Math.max(1, Math.floor(scaledValue(inst)));
 
   if (k === "damage" || k === "aoe_damage") {
-    h.hp = clamp(h.hp - val, 0, h.maxHp);
-    log(`${t.name} trifft für ${val}.`);
+    const element = (t.elements && t.elements[0]) || null;
+    const final = computeElementalDamage(val, element);
+    h.hp = clamp(h.hp - final, 0, h.maxHp);
+    logElementHit(t.name, val, final, element);
   } else if (k === "dot" || k === "bleed") {
-    h.dots.push({ dmg: val, days: 3 });
-    log(`${t.name} DoT ${val} für 3T.`);
+    const element = (t.elements && t.elements[0]) || null;
+    h.dots.push({ dmg: val, days: 3, element });
+    log(`${t.name} DoT ${val} für 3T${element ? " (" + element + ")" : ""}.`);
   } else if (k === "freeze_days") {
     const d = Math.max(1, Math.round(scaledValue(inst)));
     h.status.frozenDays = (h.status.frozenDays || 0) + d;
@@ -286,11 +314,18 @@ export function triggerNode(nodeId) {
     const val = Math.max(1, Math.floor(scaledValue(v)));
 
     if (k === "damage" || k === "aoe_damage") {
-      h.hp = clamp(h.hp - val, 0, h.maxHp);
-      log(`<b>Falle</b> ${t.name} trifft für ${val}.`);
+      const element = (t.elements && t.elements[0]) || null;
+      const final = computeElementalDamage(val, element);
+      h.hp = clamp(h.hp - final, 0, h.maxHp);
+      logElementHit(`<b>Falle</b> ${t.name}`, val, final, element);
     } else if (k === "dot" || k === "bleed") {
-      h.dots.push({ dmg: val, days: 3 });
-      log(`<b>Zone</b> ${t.name} – DoT ${val} für 3T.`);
+      const element = (t.elements && t.elements[0]) || null;
+      h.dots.push({ dmg: val, days: 3, element });
+      log(
+        `<b>Zone</b> ${t.name} – DoT ${val} für 3T` +
+        (element ? ` (${element})` : "") +
+        `.`
+      );
     } else if (k === "freeze_days" || k === "slow_move_days") {
       const d = Math.max(1, Math.round(scaledValue(v)));
       if (k === "freeze_days") h.status.frozenDays = (h.status.frozenDays || 0) + d;

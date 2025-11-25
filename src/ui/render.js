@@ -9,7 +9,7 @@
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW } from "../game/core/gameState.js";
-import { playCard, instView, newInstance, drawCards, sacrifice} from "../game/cards/cards.js";
+import {playCard,instView ,newInstance ,drawCards ,sacrifice ,bindLogger as bindCardLogger, scaledValue} from "../game/cards/cards.js";
 import { renderMap } from "../game/map/map.js";
 
 // Kleine Helper: Element-Badges für Karten
@@ -66,6 +66,11 @@ export function mountUI(app) {
     <div id="overlay"><div id="overlay-inner"></div></div>
   `;
   logBox = document.querySelector("#log");
+
+  const altar = document.querySelector("#altar");
+  if (altar) {
+    altar.addEventListener("click", onAltarClick);
+  }
 }
 
 // ============================================================================
@@ -74,6 +79,9 @@ export function mountUI(app) {
 export function bindLogs() {
   // Normaler Log
   window.__log = (msg) => log(msg);
+
+  // Karten-Engine ans selbe Log hängen
+  bindCardLogger(log);
 
   // Re-Render, aus anderen Modulen aufrufbar
   window.__render = () => render();
@@ -97,9 +105,78 @@ function log(msg) {
   if (!logBox) return;
   const div = document.createElement("div");
   div.innerHTML = msg;
-  logBox.appendChild(div);
-  logBox.scrollTop = logBox.scrollHeight;
+  // Neue Logs OBEN einfügen:
+  if (logBox.firstChild) {
+    logBox.insertBefore(div, logBox.firstChild);
+  } else {
+    logBox.appendChild(div);
+  }
+  // Immer oben bleiben (neuste Meldung sichtbar)
+  logBox.scrollTop = 0;
 }
+
+// ============================================================================
+// Opferaltar)
+// ============================================================================
+
+function onAltarClick() {
+  const s = GameState;
+  const hand = s.hand;
+
+  if (!hand.length) {
+    window.__log?.("Du hast keine Karten in der Hand, die du opfern könntest.");
+    return;
+  }
+
+  const sac = s.targeting;
+  if (!sac) {
+    window.__log?.("Wähle zuerst die Karte in deiner Hand, die du opfern willst, und klicke dann auf den Opferaltar.");
+    return;
+  }
+
+  if (hand.length < 2) {
+    window.__log?.("Du brauchst mindestens eine weitere Karte in der Hand, die verstärkt werden kann.");
+    return;
+  }
+
+  if (s.energy <= 0) {
+    window.__log?.("Du hast nicht genug Energie für ein Opfer (kostet 1 Energie).");
+    return;
+  }
+
+  const candidates = hand.filter(c => c.uid !== sac.uid);
+  if (!candidates.length) {
+    window.__log?.("Keine andere Karte in der Hand zum Verstärken gefunden.");
+    return;
+  }
+
+  const target = candidates[Math.floor(Math.random() * candidates.length)];
+
+  // Energie zahlen
+  s.energy -= 1;
+
+  const res = sacrifice(sac.uid, target.uid);
+
+  if (res?.ok) {
+    // geopferte Karte aus der Hand entfernen
+    s.hand = s.hand.filter(c => c.uid !== sac.uid);
+
+    const viewSac    = instView(sac);
+    const viewTarget = instView(target);
+
+    window.__log?.(
+      `<span class="soul">Opferung</span>: <b>${viewSac.name}</b> wurde geopfert. ` +
+      `<b>${viewTarget.name}</b> steigt auf L${target.level}. ` +
+      `(Energie jetzt ${s.energy})`
+    );
+
+    s.targeting = null;
+    window.__render?.();
+  } else {
+    window.__log?.("Opferung fehlgeschlagen.");
+  }
+}
+
 
 // ============================================================================
 // Haupt-Renderfunktion: Stats + Hand (INSTANZEN!)
@@ -110,11 +187,16 @@ export function render() {
   if (!stats) return;
 
   const h = s.hero;
-  const heroStatus = h
-    ? `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${
-        h.alive !== false ? "Lebt" : "Tot"
-      }`
-    : "kein Held";
+  let heroStatus = "kein Held";
+  if (h) {
+    const strong = h.strongElement ? `🔺${h.strongElement}` : "";
+    const weak   = h.weakElement   ? `🔻${h.weakElement}` : "";
+   const tags   = [strong, weak].filter(Boolean).join(" ");
+    heroStatus = `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${
+      h.alive !== false ? "Lebt" : "Tot"
+    }${tags ? " • " + tags : ""}`;
+  }
+
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
@@ -122,9 +204,14 @@ export function render() {
     Energie: ${s.energy}/${BASE_ENERGY} |
     Seelen: ${s.souls} |
     Hand: ${s.hand.length} |
-    Deck: ${s.deck.length} |
+    <span id="stat-deck" class="k" style="cursor:pointer">Deck: ${s.deck.length}</span> |
     ${heroStatus}
- `;
+  `;
+
+  const deckEl = document.querySelector("#stat-deck");
+  if (deckEl) {
+    deckEl.onclick = () => openDeckBrowser();
+  }
 
   // Hand zeichnen (INSTANZEN → instView)
   const hand = document.querySelector("#hand");
@@ -374,6 +461,61 @@ export function showLobby(allCards) {
 
   draw();
 }
+
+function openDeckBrowser() {
+  const ov    = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  if (!ov || !inner) return;
+
+  openOverlay();
+
+  const deckViews = GameState.deck.map(inst => instView(inst));
+
+  // gleiche Vorlagen zusammenfassen (Anzahl anzeigen)
+  const byId = new Map();
+  for (const v of deckViews) {
+    const key = v.tplId || v.id;
+    if (!byId.has(key)) {
+      byId.set(key, { ...v, count: 1 });
+    } else {
+      byId.get(key).count++;
+    }
+  }
+
+  inner.innerHTML = `
+    <div class="lobby-wrap">
+      <div class="lobby-head">
+        <h2>Deck-Übersicht (${GameState.deck.length} Karten)</h2>
+        <button id="deck-close" class="warn">Schließen</button>
+      </div>
+      <div class="lobby-grid" id="deck-grid"></div>
+    </div>
+  `;
+
+  const grid = inner.querySelector("#deck-grid");
+  byId.forEach(v => {
+    const div = document.createElement("div");
+    div.className = "card";
+    div.innerHTML = `
+      <div class="cost">L${v.level || 1}</div>
+      <div class="badge">${v.type}</div>
+      <div class="name">${v.name}</div>
+      <div class="mini">${v.id || v.tplId}</div>
+      <div class="desc small">${v.desc || ""}</div>
+      ${v.count > 1 ? `<div class="badge">×${v.count}</div>` : ""}
+      ${elementsHtml(v.elements || [])}
+    `;
+    grid.appendChild(div);
+  });
+
+  const btnClose = inner.querySelector("#deck-close");
+  if (btnClose) {
+    btnClose.onclick = () => {
+      closeOverlay();
+    };
+  }
+}
+
 
 // ============================================================================
 // Lokale Utility-Funktionen

@@ -72,14 +72,42 @@ export function endDay() {
   h.dots   = Array.isArray(h.dots) ? h.dots : [];
   h.status = h.status || {};
 
-  // --- 1) DoTs ticken lassen ---
-  let dotTotal = 0;
-  h.dots.forEach(d => { dotTotal += d.dmg; d.days--; });
+    // --- 1) DoTs ticken lassen (mit Elementen) ---
+  let totalFinal = 0;
+  const parts = [];
+
+  h.dots.forEach(d => {
+    const base = d.dmg;
+    const elem = d.element || null;
+    const factor = elementalFactorFor(h, elem);
+    const final = Math.max(0, Math.round(base * factor));
+
+    if (final > 0) {
+      h.hp = clamp(h.hp - final, 0, h.maxHp);
+      totalFinal += final;
+
+      if (elem) {
+        if (final === base) {
+          parts.push(`${final} ${elem}`);
+        } else {
+          parts.push(`${base}→${final} ${elem}`);
+        }
+      } else {
+        parts.push(`${final}`);
+      }
+    }
+    d.days--;
+  });
+
   h.dots = h.dots.filter(d => d.days > 0);
-  if (dotTotal > 0) {
-    h.hp = clamp(h.hp - dotTotal, 0, h.maxHp);
-    window.__log?.(`<span class="small muted">DoT: ${dotTotal} Schaden</span>`);
+
+  if (totalFinal > 0) {
+    const txt = parts.join(", ");
+    window.__log?.(
+      `<span class="small muted">DoT: ${txt} (gesamt ${totalFinal} Schaden)</span>`
+    );
   }
+
 
   // --- 2) Dauer-Effekte abbauen ---
   if ((h.status.frozenDays ?? 0) > 0) h.status.frozenDays--;
