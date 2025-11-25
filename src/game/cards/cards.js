@@ -32,6 +32,17 @@ function tplById(tplId) {
   return t;
 }
 
+
+// GANZ UNTEN (oder irgendwo nach tplById)
+export function isHeroCard(inst) {
+  // inst → { uid, tplId, level }
+  const t = tplById(inst.tplId);
+  // Nur diese Typen gehen direkt auf den Helden:
+  return t.type === "fluch" || t.type === "s_fluch";
+}
+
+
+
 // ==============================
 // Instanzen
 // ==============================

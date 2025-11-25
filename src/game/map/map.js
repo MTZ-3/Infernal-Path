@@ -7,11 +7,16 @@
 // - Max. 3 Kreuzungen gesamt (Knoten mit Outdeg >= 2, inkl. Start)
 // - Punkte in derselben Spalte überlappen nicht (Y-Mindestabstand + Fallback)
 // - Validator-Schleife: rollt neu, bis alles gültig ist
-// - SVG-Render, Heldmarker, Klick: Karte platzieren (GameState.targeting)
+// - SVG-Render, Heldmarker (klickbar), Klick: Karte platzieren
+//   Karten-Typen:
+//   fluch / s_fluch = direkt auf Held
+//   falle / s_falle = Fallen / Zonen auf Map
+//   dorf            = nur auf Dörfer
+//   dungeon         = nur auf Dungeons
 // ============================================================================
 
 import { GameState, rand, uid } from "../core/gameState.js";
-import { playCard, instView } from "../cards/cards.js";
+import { playCard, instView, isHeroCard } from "../cards/cards.js";
 
 let _svg, _nodesG, _linksG, _heroDot;
 
@@ -40,35 +45,50 @@ export function mountStaticMap(container) {
 // Public: Pro Runde neue Map erzeugen (rollt neu bis gültig)
 // ---------------------------------------------------------------------------
 export function regenerateMap(round = 1) {
-  const LAYERS  = 6 + Math.min(4, round); // 6..10 Spalten → 5..9 Schritte
-  const COL_MIN = 1, COL_MAX = 3;         // 1..3 Nodes pro Spalte
-  const MIN_Y   = 50, MAX_Y = 210;        // Y-Spielraum
-  const MIN_GAP = 26;                     // min. vertikaler Abstand
-  const MAX_JUNCTIONS = 3;                // global (inkl. Start)
-  const ATTEMPTS = 40;                    // max. Versuche pro Regeneration
+  const LAYERS        = 6 + Math.min(4, round); // 6..10 Spalten → 5..9 Schritte
+  const COL_MIN       = 1, COL_MAX = 3;         // 1..3 Nodes pro Spalte
+  const MIN_Y         = 50, MAX_Y = 210;        // Y-Spielraum
+  const MIN_GAP       = 26;                     // min. vertikaler Abstand
+  const MAX_JUNCTIONS = 3;                      // global (inkl. Start)
+  const ATTEMPTS      = 40;                     // max. Versuche pro Regeneration
 
-  // Spalten-X fix (über Versuche konstant)
   const marginX = 60, usableW = 800 - 2 * marginX;
   const colX = Array.from({ length: LAYERS }, (_, i) =>
     Math.round(marginX + (usableW * (i / (LAYERS - 1))))
   );
 
   for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
-    // ---- Nodes bauen (Layered, ohne Überlappungen pro Spalte) ----
     const nodes = [];
     const links = [];
 
+    // Start
     const startId = uid();
-    nodes.push({ id: startId, layer: 0, x: colX[0], y: 130, kind: "start", label: "Start" });
+    nodes.push({
+      id: startId,
+      layer: 0,
+      x: colX[0],
+      y: 130,
+      kind: "start",
+      label: "Start"
+    });
 
+    // Mittlere Layer
     for (let k = 1; k < LAYERS - 1; k++) {
       const count = rand(COL_MIN, COL_MAX);
       const ys = placeNonOverlappingYs(count, MIN_Y, MAX_Y, MIN_GAP);
       for (let i = 0; i < count; i++) {
-        nodes.push({ id: uid(), layer: k, x: colX[k], y: ys[i], kind: null, label: "" });
+        nodes.push({
+          id: uid(),
+          layer: k,
+          x: colX[k],
+          y: ys[i],
+          kind: null,
+          label: ""
+        });
       }
     }
 
+    // Schloss
     const castleId = uid();
     nodes.push({
       id: castleId,
@@ -81,20 +101,20 @@ export function regenerateMap(round = 1) {
 
     const byLayer = (l) => nodes.filter(n => n.layer === l);
 
-    // ---- Kanten bauen (vorwärts), mit Start≤2 & Junction-Budget≤3 ----
+    // Kanten bauen (vorwärts), mit Start≤2 & Junction-Budget≤3
     let junctionBudget = MAX_JUNCTIONS;
     for (let k = 0; k < LAYERS - 1; k++) {
       const A = byLayer(k), B = byLayer(k + 1);
       links.push(...buildLayerEdges(A, B, {
         isStartLayer: k === 0,
-        canTakeSecondEdge(aId) { return junctionBudget > 0; },   // zweite Kante erlaubt?
-        onTookSecondEdge(aId)  { junctionBudget = Math.max(0, junctionBudget - 1); } // Budget verbrauchen
+        canTakeSecondEdge(aId) { return junctionBudget > 0; },
+        onTookSecondEdge(aId)  { junctionBudget = Math.max(0, junctionBudget - 1); }
       }));
     }
 
-    // ---- VALIDIEREN (keine Sackgassen / nur vorwärts / Budgets / Pfade ok) ----
+    // Validierung
     if (validateGraph(nodes, links, LAYERS, startId, castleId, MAX_JUNCTIONS)) {
-      // Specials (max. 3) nach erfolgreicher Validierung verteilen (optional)
+      // Specials (max. 3) nach erfolgreicher Validierung verteilen (Dorf/Dungeon)
       let specials = 0;
       for (let k = 1; k < LAYERS - 1 && specials < 3; k++) {
         const L = byLayer(k);
@@ -108,13 +128,12 @@ export function regenerateMap(round = 1) {
         }
       }
 
-      // State übernehmen
       GameState.map.nodes    = nodes;
       GameState.map.links    = links;
       GameState.map.castleId = castleId;
       GameState.heroPos      = startId;
       GameState.placed       = new Map();
-      return; // fertig
+      return;
     }
   }
 
@@ -123,16 +142,37 @@ export function regenerateMap(round = 1) {
   const nodes = [];
   const links = [];
   const startId = uid();
-  nodes.push({ id: startId, layer: 0, x: colX[0], y: 130, kind: "start", label: "Start" });
+  nodes.push({
+    id: startId,
+    layer: 0,
+    x: colX[0],
+    y: 130,
+    kind: "start",
+    label: "Start"
+  });
   let lastId = startId;
   for (let k = 1; k < LAYERS - 1; k++) {
-    const mid = { id: uid(), layer: k, x: colX[k], y: 130, kind: null, label: "" };
+    const mid = {
+      id: uid(),
+      layer: k,
+      x: colX[k],
+      y: 130,
+      kind: null,
+      label: ""
+    };
     nodes.push(mid);
     links.push({ a: lastId, b: mid.id });
     lastId = mid.id;
   }
   const castleId = uid();
-  nodes.push({ id: castleId, layer: LAYERS - 1, x: colX[LAYERS - 1], y: 130, kind: "castle", label: "Schloss" });
+  nodes.push({
+    id: castleId,
+    layer: LAYERS - 1,
+    x: colX[LAYERS - 1],
+    y: 130,
+    kind: "castle",
+    label: "Schloss"
+  });
   links.push({ a: lastId, b: castleId });
 
   GameState.map.nodes    = nodes;
@@ -155,8 +195,10 @@ export function renderMap() {
     if (!A || !B) return;
     _linksG.appendChild(
       svgElem("line", {
-        x1: A.x, y1: A.y,
-        x2: B.x, y2: B.y,
+        x1: A.x,
+        y1: A.y,
+        x2: B.x,
+        y2: B.y,
         class: "link"
       })
     );
@@ -169,10 +211,9 @@ export function renderMap() {
 
   GameState.map.nodes.forEach(n => {
     const g = svgElem("g");
-
     let cls = "node";
 
-    // Nur für Map-Karten (special/road) highlighten; Heldenkarten lassen Map normal.
+    // Highlight nur für Map-Karten (nicht für Heldenkarten)
     if (selectedInst && selectedPlace !== "hero") {
       if (isNodeValidForInst(n, selectedInst)) {
         cls += " node-ok";
@@ -210,6 +251,8 @@ export function renderMap() {
       stroke: "#fff",
       "stroke-width": 2
     });
+    _heroDot.style.cursor = "pointer";
+    _heroDot.addEventListener("click", onHeroClick);
     _svg.appendChild(_heroDot);
   }
   const H = nodeById(GameState.heroPos);
@@ -219,52 +262,9 @@ export function renderMap() {
   }
 }
 
-// ===========================================================================
-// Interaktion: Karte auf Node platzieren
-// =========================================================================== */
-function onNodeClick(n){
-  const inst = GameState.targeting;
-  if (!inst) return; // keine Karte ausgewählt
-
-  const place = placementForInst(inst);
-
-  // 1) Helden-Karte auf Map? → verboten
-  if (place === "hero") {
-    window.__log?.("Diese Karte kannst du nur direkt auf den Helden wirken.");
-    return;
-  }
-
-  // 2) Dorf/Dungeon-Karten nur auf Dörfer/Dungeons
-  if (place === "special") {
-    if (n.kind !== "village" && n.kind !== "dungeon") {
-      window.__log?.("Diese Karte kannst du nur auf Dörfer oder Dungeons legen.");
-      return;
-    }
-  }
-
-  // 3) Fallen/Zonen nur auf Straßen / Start
-  if (place === "road") {
-    if (n.kind !== "road" && n.kind !== "start") {
-      window.__log?.("Diese Karte kannst du nur auf freie Wegfelder legen.");
-      return;
-    }
-  }
-
-  // 4) Wenn wir hier sind: Platzierung erlaubt
-  const res = playCard(inst, n.id);
-  if (res?.ok) {
-    GameState.targeting = null;  // Auswahl löschen
-    pulse(n.x, n.y);
-    window.__render?.();
-    renderMap?.();
-  } else {
-    window.__log?.(res?.log || "Konnte hier nicht platzieren.");
-  }
-}
-
-// ===========================================================================
-// Export: Vorwärts-Nachbarn (für 50/50 Bewegung in turns.js)
-// =========================================================================== */
+// ============================================================================
+// Public: Vorwärts-Nachbarn (für Bewegung / Pathfinding)
+// ============================================================================
 export function forwardNeighbors(id) {
   const here = nodeById(id);
   if (!here) return [];
@@ -278,122 +278,216 @@ export function forwardNeighbors(id) {
   return out;
 }
 
-// ===========================================================================
-// Helpers: Platzierung, Graph, SVG, Layout
-// ===========================================================================
+// ============================================================================
+// Interaktion: Karte auf Node platzieren (Fallen / Dorf / Dungeon)
+// ============================================================================
+function onNodeClick(node) {
+  const inst = GameState.targeting;
+  if (!inst) return; // keine Karte ausgewählt
 
-// Platzierungs-Typ für eine Karten-INSTANZ
-// Rückgabe: "hero" | "special" | "road"
-function placementForInst(inst) {
-  const v    = instView(inst);           // Template-View
-  const type = v.type;
-  const kind = v.effect?.kind || "";
+  const view = instView(inst);
+  const type = view.type;
 
-  // Eroberung = Karten für die Map
-  if (type === "eroberung") {
-    // Speziell: Dorf-/Dungeon-Karten
-    if (kind.includes("village") || kind.startsWith("dungeon_")) {
-      return "special";                  // nur Dorf/Dungeon
-    }
-    return "road";                       // sonst: Wege / Kreuzungen
+  // Heldenkarten gehören NICHT auf die Map
+  if (type === "fluch" || type === "s_fluch") {
+    window.__log?.("Diese Karte musst du direkt auf den Helden wirken (klicke auf den Heldmarker).");
+    return;
   }
 
-  // alles andere = direkt auf den Helden
-  return "hero";
+  // Nur Nodes akzeptieren, die wirklich gültig sind
+  if (!isNodeValidForInst(node, inst)) {
+    window.__log?.("Hier kannst du diese Karte nicht spielen.");
+    return;
+  }
+
+  const res = playCard(inst, node.id);
+
+  if (res?.ok) {
+    GameState.targeting = null;
+    pulse(node.x, node.y);
+    window.__render?.();
+    renderMap?.();
+  } else {
+    window.__log?.(res?.log || "Konnte hier nicht platzieren.");
+  }
 }
 
-// Prüft, ob ein Node zur ausgewählten Karte passt
-function isNodeValidForInst(node, inst) {
-  const place = placementForInst(inst);
+// ============================================================================
+// Interaktion: Karte direkt auf den Helden wirken
+// ============================================================================
+function onHeroClick() {
+  const inst = GameState.targeting;
+  if (!inst) {
+    window.__log?.("Wähle zuerst eine Karte in deiner Hand aus.");
+    return;
+  }
 
-  if (place === "hero") {
-    // Heldenkarten gehören NICHT auf die Map
+  // Prüfen, ob diese Instanz eine Heldenkarte ist (fluch / s_fluch)
+  if (!isHeroCard(inst)) {
+    window.__log?.("Diese Karte kann nicht direkt auf den Helden gespielt werden – lege sie auf die Karte.");
+    return;
+  }
+
+  const view = instView(inst);
+  const beforeEnergy = GameState.energy;
+  const res = playCard(inst, null); // null = direkt auf den Helden
+
+  if (res?.ok) {
+    window.__log?.(
+      `<span class="small">Fluch gespielt: <b>${view.name}</b> (Energie: ${beforeEnergy} → ${GameState.energy}).</span>`
+    );
+    GameState.targeting = null;
+    window.__render?.();
+    renderMap?.();
+  } else {
+    window.__log?.(
+      res?.log ||
+      `Karte konnte nicht gespielt werden. (Energie: ${beforeEnergy}, Kosten: ${view.cost ?? 0})`
+    );
+  }
+}
+
+
+// ============================================================================
+// Platzierungslogik: welche Felder sind erlaubt?
+// ============================================================================
+//
+// Kartentypen:
+// fluch    -> hero (nur Held)
+// s_fluch  -> hero (nur Held)
+// falle    -> Map, aber NICHT auf Dorf/Dungeon/Schloss
+// s_falle  -> NUR freie Wegfelder (kind == null)
+// dorf     -> NUR village
+// dungeon  -> NUR dungeon
+//
+function placementForInst(inst) {
+  const view = instView(inst);
+  const type = view.type;
+
+  if (type === "fluch" || type === "s_fluch") return "hero";
+  if (type === "falle" || type === "s_falle") return "trap";
+  if (type === "dorf") return "village";
+  if (type === "dungeon") return "dungeon";
+
+  return "trap"; // Fallback
+}
+
+function isNodeValidForInst(node, inst) {
+  const view = instView(inst);
+  const type = view.type;
+
+  // Heldenkarten gehören nicht auf die Map
+  if (type === "fluch" || type === "s_fluch") {
     return false;
   }
-  if (place === "special") {
-    return node.kind === "village" || node.kind === "dungeon";
+
+  // Normale Fallen: alles außer Schloss, Dorf, Dungeon
+  if (type === "falle") {
+    if (node.kind === "castle") return false;
+    if (node.kind === "village") return false;
+    if (node.kind === "dungeon") return false;
+    // Start + freie Felder sind okay
+    return true;
   }
-  if (place === "road") {
-    return node.kind === "road" || node.kind === "start";
+
+  // Sonder-Fallen: nur wirklich freie Felder (kein Start, kein Dorf, kein Dungeon, kein Schloss)
+  if (type === "s_falle") {
+    return node.kind == null;
   }
+
+  // Dorf-Karten: nur Dörfer
+  if (type === "dorf") {
+    return node.kind === "village";
+  }
+
+  // Dungeon-Karten: nur Dungeons
+  if (type === "dungeon") {
+    return node.kind === "dungeon";
+  }
+
   return false;
 }
 
-function nodeById(id){ return GameState.map.nodes.find(n=>n.id===id); }
+// ============================================================================
+// Helpers: Graph, SVG, Layout
+// ============================================================================
+function nodeById(id) {
+  return GameState.map.nodes.find(n => n.id === id);
+}
 
-function svgElem(tag, attrs={}) {
-  const e = document.createElementNS("http://www.w3.org/2000/svg",tag);
+function svgElem(tag, attrs = {}) {
+  const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
   for (const k in attrs) e.setAttribute(k, attrs[k]);
   return e;
 }
-function svgText(x,y,txt){
-  const t = svgElem("text",{
-    x,y,
-    "text-anchor":"middle",
-    "dominant-baseline":"middle",
-    fill:"#cbd5e1",
-    "font-size":"14px"
+
+function svgText(x, y, txt) {
+  const t = svgElem("text", {
+    x,
+    y,
+    "text-anchor": "middle",
+    "dominant-baseline": "middle",
+    fill: "#cbd5e1",
+    "font-size": "14px"
   });
   t.textContent = txt;
   return t;
 }
-function svgSmall(x,y,txt){
-  const t = svgElem("text",{
-    x,y,
-    "text-anchor":"middle",
-    "dominant-baseline":"middle",
-    fill:"#a7a3be",
-    "font-size":"10px"
-  });
-  t.textContent = txt;
-  return t;
-}
-function kindFill(kind){
-  if(kind==="village") return "#25321a";
-  if(kind==="dungeon") return "#2b1f33";
-  if(kind==="castle")  return "#2a243a";
-  if(kind==="start")   return "#1a1e2a";
+
+function kindFill(kind) {
+  if (kind === "village") return "#25321a";
+  if (kind === "dungeon") return "#2b1f33";
+  if (kind === "castle")  return "#2a243a";
+  if (kind === "start")   return "#1a1e2a";
   return "#0b0b12";
 }
-function pulse(x,y){
-  const p = svgElem("circle",{
-    cx:x, cy:y,
-    r:4,
-    fill:"none",
-    stroke:"#eab308",
-    "stroke-width":2,
-    opacity:1
+
+function pulse(x, y) {
+  const p = svgElem("circle", {
+    cx: x,
+    cy: y,
+    r: 4,
+    fill: "none",
+    stroke: "#eab308",
+    "stroke-width": 2,
+    opacity: 1
   });
   _svg.appendChild(p);
   const t0 = performance.now();
-  const tick = (t)=>{
-    const k = Math.min(1,(t-t0)/400);
-    p.setAttribute("r", String(4+20*k));
-    p.setAttribute("opacity", String(1-k));
-    if(k<1) requestAnimationFrame(tick); else p.remove();
+  const tick = (t) => {
+    const k = Math.min(1, (t - t0) / 400);
+    p.setAttribute("r", String(4 + 20 * k));
+    p.setAttribute("opacity", String(1 - k));
+    if (k < 1) requestAnimationFrame(tick);
+    else p.remove();
   };
   requestAnimationFrame(tick);
 }
-function shuffle(a){
-  a=[...a];
-  for(let i=a.length-1;i>0;i--){
-    const j=Math.floor(Math.random()*(i+1));
-    [a[i],a[j]]=[a[j],a[i]];
+
+function shuffle(a) {
+  a = [...a];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
-function placeNonOverlappingYs(count,minY,maxY,gap){
-  const ys=[]; let tries=0;
-  while(ys.length<count && tries<200){
+
+function placeNonOverlappingYs(count, minY, maxY, gap) {
+  const ys = [];
+  let tries = 0;
+  while (ys.length < count && tries < 200) {
     tries++;
-    const y=rand(minY,maxY);
-    if(ys.every(v=>Math.abs(v-y)>=gap)) ys.push(y);
+    const y = rand(minY, maxY);
+    if (ys.every(v => Math.abs(v - y) >= gap)) ys.push(y);
   }
-  if(ys.length<count){
-    const step=(maxY-minY)/(count+1);
-    return Array.from({length:count},(_,i)=>Math.round(minY+step*(i+1)));
+  if (ys.length < count) {
+    const step = (maxY - minY) / (count + 1);
+    return Array.from({ length: count }, (_, i) =>
+      Math.round(minY + step * (i + 1))
+    );
   }
-  return ys.sort((a,b)=>a-b);
+  return ys.sort((a, b) => a - b);
 }
 
 /**
@@ -404,100 +498,96 @@ function placeNonOverlappingYs(count,minY,maxY,gap){
  * - globales Kreuzungsbudget: nur wenn Outdeg von 1->2 wächst, Budget–- (Start zählt)
  * - Start-Layer: Start darf max. 2 Pfade
  */
-function buildLayerEdges(A, B, opts){
+function buildLayerEdges(A, B, opts) {
   const edges = [];
-  if(!A.length || !B.length) return edges;
+  if (!A.length || !B.length) return edges;
 
-  const outdeg = new Map(A.map(a=>[a.id,0]));
-  const indeg  = new Map(B.map(b=>[b.id,0]));
+  const outdeg  = new Map(A.map(a => [a.id, 0]));
+  const indeg   = new Map(B.map(b => [b.id, 0]));
   const startId = A[0]?.id;
 
   // 1) jedem A mind. 1 Ausgang – gleichmäßig über B verteilen
   const Bshuf = shuffle([...B]);
-  A.forEach((a,i)=>{
+  A.forEach((a, i) => {
     const target = Bshuf[i % Bshuf.length];
-    edges.push({ a:a.id, b:target.id });
-    outdeg.set(a.id, (outdeg.get(a.id)||0)+1);
-    indeg.set(target.id, (indeg.get(target.id)||0)+1);
+    edges.push({ a: a.id, b: target.id });
+    outdeg.set(a.id, (outdeg.get(a.id) || 0) + 1);
+    indeg.set(target.id, (indeg.get(target.id) || 0) + 1);
   });
 
   // 2) jedem B mind. 1 Eingang (falls B noch 0 hat)
-  B.forEach(b=>{
-    if((indeg.get(b.id)||0)>0) return;
+  B.forEach(b => {
+    if ((indeg.get(b.id) || 0) > 0) return;
 
-    // A mit Outdeg<2 bevorzugen; zweite Kante nur mit Budget
-    let a = A.find(x => (outdeg.get(x.id)||0) < 2);
-    if (a && (outdeg.get(a.id)||0) === 1) {
+    let a = A.find(x => (outdeg.get(x.id) || 0) < 2);
+    if (a && (outdeg.get(a.id) || 0) === 1) {
       if (!opts?.canTakeSecondEdge(a.id)) a = null;
     }
 
-    // Rewiring, wenn keiner Kapazität / Budget hat:
-    if(!a){
-      const heavy = A.find(x => (outdeg.get(x.id)||0) === 2);
-      if(heavy){
-        // suche heavy->oldB mit indeg(oldB)>1 und hänge um zu b
+    if (!a) {
+      const heavy = A.find(x => (outdeg.get(x.id) || 0) === 2);
+      if (heavy) {
         let pick = -1;
-        for(let i=0;i<edges.length;i++){
-          const E=edges[i];
-          if(E.a!==heavy.id) continue;
-          if((indeg.get(E.b)||0)>1){ pick=i; break; }
+        for (let i = 0; i < edges.length; i++) {
+          const E = edges[i];
+          if (E.a !== heavy.id) continue;
+          if ((indeg.get(E.b) || 0) > 1) { pick = i; break; }
         }
-        if(pick!==-1){
-          const old=edges[pick];
-          edges[pick]={ a:heavy.id, b:b.id };
-          indeg.set(old.b,(indeg.get(old.b)||0)-1);
-          indeg.set(b.id,(indeg.get(b.id)||0)+1);
+        if (pick !== -1) {
+          const old = edges[pick];
+          edges[pick] = { a: heavy.id, b: b.id };
+          indeg.set(old.b, (indeg.get(old.b) || 0) - 1);
+          indeg.set(b.id, (indeg.get(b.id) || 0) + 1);
           return;
         }
       }
     }
 
-    // Falls jetzt a vorhanden: zweite Kante hinzufügen (Budget evtl. ziehen)
-    if(a){
-      if((outdeg.get(a.id)||0)===1){ opts?.onTookSecondEdge?.(a.id); }
-      edges.push({ a:a.id, b:b.id });
-      outdeg.set(a.id, (outdeg.get(a.id)||0)+1);
-      indeg.set(b.id, (indeg.get(b.id)||0)+1);
+    if (a) {
+      if ((outdeg.get(a.id) || 0) === 1) { opts?.onTookSecondEdge?.(a.id); }
+      edges.push({ a: a.id, b: b.id });
+      outdeg.set(a.id, (outdeg.get(a.id) || 0) + 1);
+      indeg.set(b.id, (indeg.get(b.id) || 0) + 1);
       return;
     }
 
-    // Notfall: irgendein A (auch Start), solange Start nicht >2 wird
     const fallback = A[0];
-    if(fallback){
-      if(!(opts?.isStartLayer && fallback.id===startId && (outdeg.get(fallback.id)||0)>=2)){
-        if((outdeg.get(fallback.id)||0)===1){ opts?.onTookSecondEdge?.(fallback.id); }
-        edges.push({ a:fallback.id, b:b.id });
-        outdeg.set(fallback.id, (outdeg.get(fallback.id)||0)+1);
-        indeg.set(b.id, (indeg.get(b.id)||0)+1);
+    if (fallback) {
+      if (!(opts?.isStartLayer && fallback.id === startId && (outdeg.get(fallback.id) || 0) >= 2)) {
+        if ((outdeg.get(fallback.id) || 0) === 1) { opts?.onTookSecondEdge?.(fallback.id); }
+        edges.push({ a: fallback.id, b: b.id });
+        outdeg.set(fallback.id, (outdeg.get(fallback.id) || 0) + 1);
+        indeg.set(b.id, (indeg.get(b.id) || 0) + 1);
       }
     }
   });
 
-  // 3) Start-Layer-Hardcap: notfalls überschüssige Start-Kanten löschen
-  if(opts?.isStartLayer && startId){
-    while((outdeg.get(startId)||0)>2){
-      let removed=false;
-      for(let i=edges.length-1;i>=0;i--){
-        const E=edges[i];
-        if(E.a!==startId) continue;
-        if((indeg.get(E.b)||0)>1){
-          edges.splice(i,1);
-          outdeg.set(startId,(outdeg.get(startId)||0)-1);
-          indeg.set(E.b,(indeg.get(E.b)||0)-1);
-          removed=true; break;
+  // 3) Start-Layer-Hardcap
+  if (opts?.isStartLayer && startId) {
+    while ((outdeg.get(startId) || 0) > 2) {
+      let removed = false;
+      for (let i = edges.length - 1; i >= 0; i--) {
+        const E = edges[i];
+        if (E.a !== startId) continue;
+        if ((indeg.get(E.b) || 0) > 1) {
+          edges.splice(i, 1);
+          outdeg.set(startId, (outdeg.get(startId) || 0) - 1);
+          indeg.set(E.b, (indeg.get(E.b) || 0) - 1);
+          removed = true;
+          break;
         }
       }
-      if(!removed) break;
+      if (!removed) break;
     }
   }
 
-  // 4) Sicherheit: A ohne Ausgang reparieren (sollte kaum auftreten)
-  A.forEach(a=>{
-    if((outdeg.get(a.id)||0)===0){
-      const target = B[Math.floor(Math.random()*B.length)];
-      edges.push({ a:a.id, b:target.id });
-      outdeg.set(a.id,1);
-      indeg.set(target.id,(indeg.get(target.id)||0)+1);
+  // 4) A ohne Ausgang reparieren
+  A.forEach(a => {
+    if ((outdeg.get(a.id) || 0) === 0) {
+      const target = B[Math.floor(Math.random() * B.length)];
+      edges.push({ a: a.id, b: target.id });
+      outdeg.set(a.id, 1);
+      indeg.set(target.id, (indeg.get(target.id) || 0) + 1);
     }
   });
 
@@ -512,30 +602,25 @@ function validateGraph(nodes, links, LAYERS, startId, castleId, maxJunctions) {
   const indeg  = new Map(nodes.map(n => [n.id, 0]));
   const outdeg = new Map(nodes.map(n => [n.id, 0]));
 
-  // nur vorwärts & Degree zählen
   for (const L of links) {
     const a = byId.get(L.a), b = byId.get(L.b);
     if (!a || !b) return false;
-    if (b.layer !== a.layer + 1) return false;           // nicht vorwärts → invalid
+    if (b.layer !== a.layer + 1) return false;
     indeg.set(b.id,  (indeg.get(b.id)  || 0) + 1);
     outdeg.set(a.id, (outdeg.get(a.id) || 0) + 1);
   }
 
-  // Start ≤ 2
   if ((outdeg.get(startId) || 0) > 2) return false;
 
-  // max. Junctions (Outdeg ≥ 2)
   const junctions = nodes.filter(n => (outdeg.get(n.id) || 0) >= 2).length;
   if (junctions > maxJunctions) return false;
 
-  // Eingänge/Ausgänge vorhanden (keine Sackgassen)
   for (const n of nodes) {
-    if (n.id !== startId  && (indeg.get(n.id)  || 0) <= 0) return false; // außer Start: Eingang nötig
-    if (n.id !== castleId && (outdeg.get(n.id) || 0) <= 0) return false; // außer Castle: Ausgang nötig
-    if ((outdeg.get(n.id) || 0) > 2) return false;                        // Outdeg Cap
+    if (n.id !== startId  && (indeg.get(n.id)  || 0) <= 0) return false;
+    if (n.id !== castleId && (outdeg.get(n.id) || 0) <= 0) return false;
+    if ((outdeg.get(n.id) || 0) > 2) return false;
   }
 
-  // Erreichbarkeit vom Start (forward BFS)
   const forwardAdj = new Map(nodes.map(n => [n.id, []]));
   links.forEach(L => forwardAdj.get(L.a).push(L.b));
   const reachFromStart = new Set([startId]);
@@ -551,7 +636,6 @@ function validateGraph(nodes, links, LAYERS, startId, castleId, maxJunctions) {
   }
   if (!reachFromStart.has(castleId)) return false;
 
-  // Castle-Erreichbarkeit (reverse BFS)
   const reverseAdj = new Map(nodes.map(n => [n.id, []]));
   links.forEach(L => reverseAdj.get(L.b).push(L.a));
   const canReachCastle = new Set([castleId]);
@@ -566,10 +650,10 @@ function validateGraph(nodes, links, LAYERS, startId, castleId, maxJunctions) {
     }
   }
 
-  // Jeder Node muss auf einem Start→Castle-Pfad liegen
   for (const n of nodes) {
     if (!reachFromStart.has(n.id)) return false;
     if (!canReachCastle.has(n.id)) return false;
   }
+
   return true;
 }

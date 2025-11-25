@@ -1,298 +1,149 @@
 [
-  { "id":"feuerkugel", "name":"Feuerkugel", "type":"fluch", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":4,"growth":0.45},
-    "desc":"Verursacht skalierten Feuerschaden. Die Flamme leckt am Verstand des Helden."
+  {
+    "id": "feuerstoss",
+    "name": "Feuerstoß",
+    "type": "fluch",
+    "elements": ["feuer"],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 5,
+      "growth": 0.5
+    },
+    "desc": "Direkter Fluch: Verursacht sofort Feuerschaden am Helden."
   },
-  { "id":"blutstich", "name":"Blutstich", "type":"fluch", "elements":["blut"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":2,"growth":0.3},
-    "desc":"Kleiner Burst mit steigendem Wert. Ein Nadelstich, aus dem ein Strom wird."
-  },
-  { "id":"schattenstoss", "name":"Schattenstoß", "type":"fluch", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":3,"growth":0.4},
-    "desc":"Solider Schattenschaden. Ein lautloser Hieb aus der Finsternis."
-  },
-  { "id":"frostgriff", "name":"Frostgriff", "type":"kontrolle", "elements":["eis"], "cost":1,
-    "effect":{"kind":"freeze_days","scaleType":"log","base":1,"growth":0.6,"cap":3},
-    "desc":"Hält den Helden X Tage an Ort und Stelle. Kälte schließt sich wie Ketten um seine Knochen."
-  },
-  { "id":"dornenbiss", "name":"Dornenbiss", "type":"fluch", "elements":["natur"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":2,"growth":0.3},
-    "desc":"Günstiger Treffer; der nächste Gegenschlag schmerzt. Dornen trinken bereitwillig."
-  },
-  { "id":"verdorrung", "name":"Verdorrung", "type":"fluch", "elements":["natur"], "cost":1,
-    "effect":{"kind":"reduce_maxhp","scaleType":"log","base":2,"growth":0.5},
-    "desc":"Senkt dauerhaft die Max-HP des Helden. Fleisch wird Laub, das zu Staub zerfällt."
-  },
-  { "id":"seelenbrand", "name":"Seelenbrand", "type":"fluch", "elements":["feuer","blut"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":3,"growth":0.5},
-    "desc":"Starker Burst mit Blutthema. Das Feuer trinkt, was das Herz vergießt."
-  },
-  { "id":"verfluchte_winde", "name":"Verfluchte Winde", "type":"kontrolle", "elements":["schatten","licht"], "cost":1,
-    "effect":{"kind":"weaken","scaleType":"log","base":2,"growth":0.7,"cap":4},
-    "desc":"Gibt dem Helden Schwäche (reduziert seine Wirkung). Flüstern weht Mut davon."
-  },
-  { "id":"dunkles_mal", "name":"Dunkles Mal", "type":"ritual", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"buff_fluch_pct","scaleType":"linear","base":1,"growth":0.2},
-    "desc":"Alle Flüche verursachen +X% Schaden in diesem Run. Ein Zeichen, das brennt, ohne zu leuchten."
-  },
-  { "id":"giftregen", "name":"Giftregen", "type":"fluch", "elements":["blut","natur"], "cost":1,
-    "effect":{"kind":"dot","scaleType":"linear","base":1,"growth":0.25},
-    "desc":"Täglicher DoT für mehrere Tage. Tropfen für Tropfen verdirbt das Blut."
+  {
+    "id": "eisiger_blick",
+    "name": "Eisiger Blick",
+    "type": "fluch",
+    "elements": ["eis"],
+    "cost": 1,
+    "effect": {
+      "kind": "freeze_days",
+      "scaleType": "log",
+      "base": 1,
+      "growth": 0.6,
+      "cap": 3
+    },
+    "desc": "Direkter Fluch: Friert den Helden für einige Tage ein."
   },
 
-  { "id":"seelenpeitsche", "name":"Seelenpeitsche", "type":"fluch", "elements":["blut"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":2,"growth":0.35},
-    "desc":"Direktschaden; bei Kill +1 Seele (separat zählen). Schreie hallen an deinem Altar wider."
-  },
-  { "id":"faeulnis", "name":"Fäulnis", "type":"fluch", "elements":["blut","natur"], "cost":1,
-    "effect":{"kind":"dot","scaleType":"linear","base":1,"growth":0.35},
-    "desc":"Wachsender täglicher Schaden. Ein Makel, der wuchert."
-  },
-  { "id":"feuerasche", "name":"Feuerasche", "type":"fluch", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"dot","scaleType":"linear","base":1,"growth":0.2},
-    "desc":"Leichter, stapelbarer Brand-DoT. Glut, die nie ganz erlischt."
-  },
-  { "id":"seelenriss", "name":"Seelenriss", "type":"fluch", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":3,"growth":0.35},
-    "desc":"Solider Burst; stärker unter Schwächung. Die Seele hat keine Narbe – nur ein Loch."
-  },
-  { "id":"klingenregen", "name":"Klingenregen", "type":"fluch", "elements":["schatten","blut"], "cost":1,
-    "effect":{"kind":"damage_multi","scaleType":"linear","base":4,"growth":0.5},
-    "desc":"Mehrfachtreffer mit gutem Scaling. Jeder Tropfen zählt doppelt."
+  {
+    "id": "schattenriss",
+    "name": "Schattenriss",
+    "type": "s_fluch",
+    "elements": ["schatten"],
+    "cost": 1,
+    "effect": {
+      "kind": "weaken",
+      "scaleType": "log",
+      "base": 2,
+      "growth": 0.6,
+      "cap": 4
+    },
+    "desc": "Sonder-Fluch: Schwächt den Helden, seine Angriffe werden wirkungsloser."
   },
 
-  { "id":"blutdaemon", "name":"Blutdämon", "type":"daemon", "elements":["blut"], "cost":1,
-    "effect":{"kind":"summon_dot","scaleType":"linear","base":2,"growth":0.4},
-    "desc":"Beschwörung, die täglich Schaden zufügt. Ein Diener, der vom Puls lebt."
+  {
+    "id": "feuerfalle",
+    "name": "Feuerfalle",
+    "type": "falle",
+    "elements": ["feuer"],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 3,
+      "growth": 0.4
+    },
+    "desc": "Falle: Verursacht Feuerschaden, wenn der Held dieses Feld betritt."
   },
-  { "id":"schattenbestie", "name":"Schattenbestie", "type":"daemon", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"summon_onplay_dmg","scaleType":"linear","base":3,"growth":0.3},
-    "desc":"On-Play-Schaden plus kleiner Tick. Ein Maul voll Nacht."
-  },
-  { "id":"hoellenhund", "name":"Höllenhund", "type":"daemon", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"summon_scaling","scaleType":"linear","base":2,"growth":0.4},
-    "desc":"Beschwörung, die durch Dorfverzehr stärker wird (externer Stack). Er frisst, was Hilfe versprach."
-  },
-  { "id":"grubenwaechter", "name":"Grubenwächter", "type":"daemon", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"delay","scaleType":"log","base":1,"growth":0.5,"cap":3},
-    "desc":"Verlangsamt Heldenbewegung um X Tage. Ein Wächter, der Zeit verschlingt."
-  },
-  { "id":"knochenpriester", "name":"Knochenpriester", "type":"daemon", "elements":["blut"], "cost":1,
-    "effect":{"kind":"buff_daemon_pct","scaleType":"log","base":5,"growth":0.6,"cap":25},
-    "desc":"Verstärkt Dämonen-Schaden um X%. Gebete in gebrochenen Zungen."
-  },
-
-  { "id":"blutgeissel", "name":"Blutgeißel", "type":"daemon", "elements":["blut"], "cost":1,
-    "effect":{"kind":"sacrifice_burst","scaleType":"linear","base":3,"growth":0.5},
-    "desc":"Opfere ihn für skalierenden Burst. Opfer sind Währungen der Hölle."
-  },
-  { "id":"runenfresser", "name":"Runenfresser", "type":"daemon", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"sacrifice_rune_boost_pct","scaleType":"linear","base":10,"growth":0.5},
-    "desc":"Opfere ihn → Runen wirken X% stärker (temporär). Ein Maul für deine Sigillen."
-  },
-  { "id":"altarwaechter", "name":"Altarwächter", "type":"daemon", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"daemon_slots","scaleType":"log","base":1,"growth":0.4,"cap":3},
-    "desc":"Erhöht das Dämonen-Limit um X. Mehr Platz für Treue – oder Hunger."
-  },
-  { "id":"fleischformer", "name":"Fleischformer", "type":"daemon", "elements":["blut"], "cost":1,
-    "effect":{"kind":"convert","scaleType":"linear","base":2,"growth":0.3},
-    "desc":"Opfere 1 Dämon → beschwöre X schwache Diener. Aus eins werden viele."
-  },
-  { "id":"daemonenkoenig", "name":"Dämonenkönig", "type":"daemon", "elements":["feuer","schatten"], "cost":1,
-    "effect":{"kind":"consume_all_burst","scaleType":"linear","base":10,"growth":1.0},
-    "desc":"Opfert alle Dämonen für massiven Burst. Eine einzige Krönung, dann nur noch Asche."
+  {
+    "id": "dornenfalle",
+    "name": "Dornenfalle",
+    "type": "falle",
+    "elements": ["natur"],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 3,
+      "growth": 0.4
+    },
+    "desc": "Falle: Naturschaden beim Betreten – jeder Schritt reißt die Wunden weiter auf."
   },
 
-  { "id":"blutpakt", "name":"Blutpakt", "type":"ritual", "elements":["blut"], "cost":1,
-    "effect":{"kind":"gain_energy","scaleType":"linear","base":2,"growth":0.3},
-    "desc":"Bezahle Seelen → erhalte X Energie. Verträge werden in Puls geschrieben."
-  },
-  { "id":"schattenritual", "name":"Schattenritual", "type":"ritual", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"draw_per_turn","scaleType":"log","base":1,"growth":0.6,"cap":3},
-    "desc":"Dauerhaft +X Karten pro Tag. Flüstern leitet deine Hand."
-  },
-  { "id":"runenfokus", "name":"Runenfokus", "type":"ritual", "elements":["licht"], "cost":1,
-    "effect":{"kind":"rune_cost_reduction_pct","scaleType":"log","base":10,"growth":0.5,"cap":30},
-    "desc":"Runen kosten X% weniger. Klarheit schneidet durch den Preis."
-  },
-  { "id":"feueropfer", "name":"Feueropfer", "type":"ritual", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"buff_damage_pct_temp","scaleType":"linear","base":3,"growth":0.5},
-    "desc":"Vorübergehend +X% Schaden. Die Glut verzehrt Zaudern."
-  },
-  { "id":"runenwelle", "name":"Runenwelle", "type":"ritual", "elements":["schatten","licht"], "cost":1,
-    "effect":{"kind":"gain_random_runes","scaleType":"log","base":1,"growth":0.5,"cap":3},
-    "desc":"Erhalte X zufällige Runen kostenlos. Der Altar spielt seine eigenen Spiele."
+  {
+    "id": "blutpfuhl",
+    "name": "Blutpfuhl",
+    "type": "s_falle",
+    "elements": ["blut", "schatten"],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0.3
+    },
+    "desc": "Sonder-Falle: Erzeugt eine Zone, die den Helden über mehrere Tage schwächt und bluten lässt."
   },
 
-  { "id":"seelenrausch", "name":"Seelenrausch", "type":"ritual", "elements":["blut"], "cost":1,
-    "effect":{"kind":"gain_souls","scaleType":"linear","base":5,"growth":1.5},
-    "desc":"Erhalte X Seelen sofort. Ein kurzer Rausch, ein langer Schatten."
+  {
+    "id": "verfluchtes_dorf",
+    "name": "Verfluchtes Dorf",
+    "type": "dorf",
+    "elements": ["schatten", "blut"],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.3
+    },
+    "desc": "Dorf-Karte: Nur auf Dörfer spielbar. Beim Betreten erleidet der Held über mehrere Tage Schaden."
   },
-  { "id":"blutopfer", "name":"Blutopfer", "type":"ritual", "elements":["blut"], "cost":1,
-    "effect":{"kind":"extend_run_days","scaleType":"linear","base":1,"growth":0.4},
-    "desc":"Verlängert den Run um X Tage. Zeit ist auch nur Fleisch."
-  },
-  { "id":"pakt_der_tiefe", "name":"Pakt der Tiefe", "type":"ritual", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"buff_all_fluch_pct","scaleType":"log","base":5,"growth":0.4,"cap":20},
-    "desc":"Alle Flüche dauerhaft +X%. Tiefe Wasser tragen flache Gräber."
-  },
-  { "id":"seelenkompass", "name":"Seelenkompass", "type":"ritual", "elements":["licht","schatten"], "cost":1,
-    "effect":{"kind":"map_reveal","scaleType":"log","base":1,"growth":0.4,"cap":3},
-    "desc":"Deckt X Felder/Infos der Karte auf. Die Karte flüstert den kürzesten Schmerz."
-  },
-  { "id":"ritual_der_gier", "name":"Ritual der Gier", "type":"ritual", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"draw_now","scaleType":"linear","base":1,"growth":0.3},
-    "desc":"Ziehe sofort X Karten. Gier hat immer eine Hand frei."
-  },
-
-  { "id":"fesseln_des_abgrunds", "name":"Fesseln des Abgrunds", "type":"kontrolle", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"slow_move_days","scaleType":"log","base":1,"growth":0.7,"cap":3},
-    "desc":"Held braucht doppelt so lange pro Feld (X Tage). Ketten, aus Nacht geschmiedet."
-  },
-  { "id":"eisiger_griff", "name":"Eisiger Griff", "type":"kontrolle", "elements":["eis"], "cost":1,
-    "effect":{"kind":"freeze_days","scaleType":"log","base":1,"growth":0.5,"cap":3},
-    "desc":"Einfrieren für X Tage. Das Herz schlägt langsamer – die Angst nicht."
-  },
-  { "id":"nebel_des_wahnsinns", "name":"Nebel des Wahnsinns", "type":"kontrolle", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"self_hit_pct","scaleType":"log","base":25,"growth":0.6,"cap":60},
-    "desc":"Held erleidet X% seines eigenen Angriffsschadens selbst. Die Klinge vergisst die Hand nicht."
-  },
-  { "id":"zehrende_dunkelheit", "name":"Zehrende Dunkelheit", "type":"kontrolle", "elements":["blut","schatten"], "cost":1,
-    "effect":{"kind":"dot","scaleType":"linear","base":3,"growth":0.4},
-    "desc":"Täglicher DoT; Bewegung leicht verlangsamt. Dunkelheit ist geduldiger als Hoffnung."
-  },
-  { "id":"blendung", "name":"Blendung", "type":"kontrolle", "elements":["licht"], "cost":1,
-    "effect":{"kind":"disable_runes_days","scaleType":"log","base":1,"growth":0.5,"cap":3},
-    "desc":"Deaktiviert Helden-Runen für X Tage. Ein grelles Nichts, das alles nimmt."
-  },
-  { "id":"zeitbruch", "name":"Zeitbruch", "type":"kontrolle", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"global_delay_days","scaleType":"log","base":1,"growth":0.6,"cap":3},
-    "desc":"Verlängert jeden Run-Tag um X. Die Uhr lernt kriechen."
+  {
+    "id": "blutzehnt",
+    "name": "Blutzehnt",
+    "type": "dorf",
+    "elements": ["blut"],
+    "cost": 1,
+    "effect": {
+      "kind": "gain_souls",
+      "scaleType": "linear",
+      "base": 3,
+      "growth": 1
+    },
+    "desc": "Dorf-Karte: Nur auf Dörfer spielbar. Jede Ankunft des Helden bringt dir Seelen."
   },
 
-  { "id":"blutnebel_dorf", "name":"Blutnebel über dem Dorf", "type":"eroberung", "elements":["blut"], "cost":1,
-    "effect":{"kind":"corrupt_chance","scaleType":"linear","base":0.01,"growth":0.01},
-    "desc":"Markiert ein Dorf; jede Nacht X Chance auf permanente Korruption (blockiert Heilung, +10 Seelen). Rot legt sich über die Dächer."
+  {
+    "id": "giftige_katakomben",
+    "name": "Giftige Katakomben",
+    "type": "dungeon",
+    "elements": ["natur", "schatten"],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.3
+    },
+    "desc": "Dungeon-Karte: Nur auf Dungeons spielbar. Die Luft hier frißt sich Tag für Tag in die Lungen des Helden."
   },
-  { "id":"korrumpierter_boden", "name":"Korrumpierter Boden", "type":"eroberung", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"dark_radius_fields","scaleType":"log","base":1,"growth":0.6,"cap":5},
-    "desc":"Erzeugt Dunkelheitszone mit Radius X; Dämonen dort +10% Schaden. Der Boden atmet tiefer."
-  },
-  { "id":"opferaltar", "name":"Opferaltar", "type":"eroberung", "elements":["blut","natur"], "cost":1,
-    "effect":{"kind":"altar_souls_per_day","scaleType":"linear","base":1,"growth":0.4},
-    "desc":"Errichtet einen Mini-Altar: +X Seelen/Tag (verfällt nach 10 Tagen). Wo Blut fällt, wächst Ernte."
-  },
-  { "id":"daemonenpforte", "name":"Dämonenpforte", "type":"eroberung", "elements":["feuer","schatten"], "cost":1,
-    "effect":{"kind":"portal_slots","scaleType":"linear","base":1,"growth":0.25},
-    "desc":"Öffnet ein Portal: Pro Tag bis zu X Dämonen beschwörbar. Ein Riss, der nur nach innen führt."
-  },
-  { "id":"dungeons_vergiften", "name":"Dungeons vergiften", "type":"eroberung", "elements":["blut"], "cost":1,
-    "effect":{"kind":"dungeon_poison_dot","scaleType":"log","base":1,"growth":0.5,"cap":4},
-    "desc":"Jeder Dungeon verursacht X DoT pro Tag. Stille Hallen, giftige Luft."
-  },
-
-  { "id":"verlorener_glockenschlag", "name":"Verlorener Glockenschlag", "type":"eroberung", "elements":["schatten","blut"], "cost":1,
-    "effect":{"kind":"village_still_days","scaleType":"linear","base":1,"growth":0.3},
-    "desc":"Dörfer werden still: Betritt der Held sie, verliert er X Tage. Kein Klang, keine Zuflucht."
-  },
-  { "id":"schrei_der_erde", "name":"Schrei der Erde", "type":"eroberung", "elements":["blut","natur"], "cost":1,
-    "effect":{"kind":"dungeon_quake_damage","scaleType":"linear","base":2,"growth":0.5},
-    "desc":"Beim Aufdecken eines Dungeons erleidet der Held X Schaden. Der Boden öffnet seine Zähne."
-  },
-  { "id":"schwarze_ernte", "name":"Schwarze Ernte", "type":"eroberung", "elements":["blut"], "cost":1,
-    "effect":{"kind":"souls_on_village_fall","scaleType":"linear","base":10,"growth":1.2},
-    "desc":"Bei Dorf-Fall/Korruption: +X Seelen. Felder stehen noch, Herzen nicht."
-  },
-  { "id":"schwarzer_markt", "name":"Schwarzer Markt", "type":"eroberung", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"shop_refresh","scaleType":"log","base":1,"growth":0.4,"cap":3},
-    "desc":"Ermöglicht X zusätzliche Shop-Neuwürfe. Münzen sind nur glänzende Opfer."
-  },
-  { "id":"verwilderung", "name":"Verwilderung", "type":"eroberung", "elements":["natur"], "cost":1,
-    "effect":{"kind":"road_slow_fields","scaleType":"log","base":1,"growth":0.5,"cap":4},
-    "desc":"Straßen in der Zone verlangsamen den Helden (X Felder). Die Pfade werden zu Wurzeln."
-  },
-
-  { "id":"daemonensturm", "name":"Dämonensturm", "type":"spezial", "elements":["feuer","schatten"], "cost":1,
-    "effect":{"kind":"aoe_damage","scaleType":"linear","base":10,"growth":0.8},
-    "desc":"Breiter Flächen-Burst. Ein Chor aus Klauen und Klingen."
-  },
-  { "id":"blutmond", "name":"Blutmond", "type":"spezial", "elements":["blut"], "cost":1,
-    "effect":{"kind":"buff_daemon_pct_temp","scaleType":"log","base":100,"growth":0.7,"cap":180},
-    "desc":"Dämonen verursachen +X% Schaden (kurz). Der Himmel trägt deine Farbe."
-  },
-  { "id":"ewige_finsternis", "name":"Ewige Finsternis", "type":"spezial", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"duration_pct","scaleType":"linear","base":50,"growth":0.4},
-    "desc":"Alle deine Effekte halten X% länger. Zeit verlernt das Vergehen."
-  },
-  { "id":"seelenbruch", "name":"Seelenbruch", "type":"spezial", "elements":["blut","licht"], "cost":1,
-    "effect":{"kind":"percent_current_hp","scaleType":"linear","base":30,"growth":0.6},
-    "desc":"Fügt X% der aktuellen Helden-HP als Schaden zu. Der Druck lässt Risse singen."
-  },
-  { "id":"daemonenpakt", "name":"Dämonenpakt", "type":"spezial", "elements":["blut"], "cost":1,
-    "effect":{"kind":"sacrifice_gain_curses","scaleType":"linear","base":2,"growth":0.5},
-    "desc":"Opfere 1 Dämon → erhalte X neue Flüche. Verträge, die mit Zähnen unterschrieben werden."
-  },
-
-  { "id":"schlag", "name":"Schlag", "type":"fluch", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":2,"growth":0.25},
-    "desc":"Sehr günstiger Basishit. Ein Anfang für jede Wunde."
-  },
-  { "id":"brandmal", "name":"Brandmal", "type":"fluch", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"dot","scaleType":"linear","base":1,"growth":0.25},
-    "desc":"Kleiner Burn-DoT. Das Zeichen bleibt, die Haut nicht."
-  },
-  { "id":"blutung", "name":"Blutung", "type":"fluch", "elements":["blut"], "cost":1,
-    "effect":{"kind":"bleed","scaleType":"linear","base":1,"growth":0.35},
-    "desc":"Täglicher Blutverlust. Jeder Schritt wird schwerer."
-  },
-  { "id":"schwaechung", "name":"Schwächung", "type":"kontrolle", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"weaken","scaleType":"log","base":2,"growth":0.6,"cap":4},
-    "desc":"Reduziert die Wirksamkeit gegnerischer Aktionen. Zweifel ist die beste Klinge."
-  },
-  { "id":"opferung", "name":"Opferung", "type":"ritual", "elements":["blut"], "cost":1,
-    "effect":{"kind":"gain_energy","scaleType":"log","base":1,"growth":0.6,"cap":3},
-    "desc":"Erhalte sofort +X Energie. Ein Schnitt, viele Möglichkeiten."
-  },
-
-  { "id":"runen_ankurbelung", "name":"Runen-Ankurbelung", "type":"ritual", "elements":["licht"], "cost":1,
-    "effect":{"kind":"rune_refresh","scaleType":"log","base":1,"growth":0.4,"cap":3},
-    "desc":"Reroll für Runenangebote bis zu X-mal. Glück ist nur ein anderer Dämon."
-  },
-  { "id":"finsteraura", "name":"Finsteraura", "type":"ritual", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"buff_fluch_pct","scaleType":"linear","base":2,"growth":0.25},
-    "desc":"Stetiger Bonus auf Flüche (+X%). Die Luft wird schwer und hungrig."
-  },
-  { "id":"knochenkette", "name":"Knochenkette", "type":"daemon", "elements":["blut"], "cost":1,
-    "effect":{"kind":"summon_onplay_dmg","scaleType":"linear","base":2,"growth":0.25},
-    "desc":"Günstige Beschwörung mit Sofortschaden. Rasseln, das Herzen stolpern lässt."
-  },
-  { "id":"hungernder_schwarm", "name":"Hungernder Schwarm", "type":"daemon", "elements":["schatten","blut"], "cost":1,
-    "effect":{"kind":"summon_stack_dot","scaleType":"linear","base":1,"growth":0.3},
-    "desc":"Mehrere schwache Dämonen mit gemeinsamem DoT. Viele Münder, ein Wille."
-  },
-  { "id":"glut_hauch", "name":"Gluthauch", "type":"fluch", "elements":["feuer"], "cost":1,
-    "effect":{"kind":"damage","scaleType":"linear","base":3,"growth":0.35},
-    "desc":"Mittlerer Burst. Atem, der Blasen zieht."
-  },
-
-  { "id":"schwarze_saat", "name":"Schwarze Saat", "type":"eroberung", "elements":["natur","schatten"], "cost":1,
-    "effect":{"kind":"spread_chance","scaleType":"linear","base":0.01,"growth":0.01},
-    "desc":"Jede Nacht X Chance, angrenzende Felder zu verfinstern. Dunkelheit wächst wie Unkraut."
-  },
-  { "id":"siegel_der_nacht", "name":"Siegel der Nacht", "type":"eroberung", "elements":["schatten"], "cost":1,
-    "effect":{"kind":"disable_village_heal_days","scaleType":"linear","base":1,"growth":0.3},
-    "desc":"Blockiert Dorfsheilung für X Tage. Kein Gebet erreicht den Himmel."
-  },
-  { "id":"kristallfrost", "name":"Kristallfrost", "type":"kontrolle", "elements":["eis"], "cost":1,
-    "effect":{"kind":"freeze_days","scaleType":"log","base":1,"growth":0.5,"cap":3},
-    "desc":"Stärkeres Einfrieren (teurer in Deckbau-Strategien). Kälte, die Gedanken knackt."
-  },
-  { "id":"seelensog", "name":"Seelensog", "type":"ritual", "elements":["schatten","blut"], "cost":1,
-    "effect":{"kind":"gain_souls","scaleType":"linear","base":6,"growth":1.2},
-    "desc":"Ziehe X Seelen aus besetzten Feldern. Karten knistern, wenn sie trinken."
-  },
-  { "id":"runen_verschmelzung", "name":"Runen-Verschmelzung", "type":"ritual", "elements":["licht","schatten"], "cost":1,
-    "effect":{"kind":"rune_amp_pct","scaleType":"log","base":5,"growth":0.4,"cap":20},
-    "desc":"Bestehende Runen wirken X% stärker. Glyphen tanzen und werden eins."
+  {
+    "id": "sturzfalle",
+    "name": "Sturzfalle",
+    "type": "dungeon",
+    "elements": ["eis", "licht"],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 4,
+      "growth": 0.5
+    },
+    "desc": "Dungeon-Karte: Nur auf Dungeons spielbar. Ein plötzlicher Sturz fügt dem Helden massiven Schaden zu."
   }
 ]
