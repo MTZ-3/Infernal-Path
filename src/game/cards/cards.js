@@ -1,28 +1,59 @@
 // ============================================================================
 // Karten-Engine (instanzbasiert)
 // ----------------------------------------------------------------------------
-// Grundidee:
-// - Es gibt VORLAGEN (Card-Templates) in einer Library (einmalig).
-// - Im Deck/Hand liegen INSTANZEN { uid, tplId, level }.
-// - Am Tagesbeginn werden 5 Instanzen zufällig gezogen.
-// - Beim Spielen/Platzieren verlässt die Instanz die Hand und
-//   geht (sofern nicht geopfert) sofort ZURÜCK INS DECK (gemischt).
-// - Nur "Opferung" entfernt eine Instanz dauerhaft.
+// - Templates in einer Library (TPL)
+// - Deck/Hand bestehen aus Instanzen { uid, tplId, level }
+// - Instanzen werden gezogen, gespielt und kehren (meist) ins Deck zurück
+// - Nur Opferung entfernt Instanzen endgültig
+// - Element-Schwächen/Stärken + Element-Runen werden beim Schaden berücksichtigt
+// ============================================================================
+
+// ============================================================================
+// Karten-Engine (instanzbasiert)
 // ============================================================================
 
 import { GameState, uid, clamp } from "../core/gameState.js";
 
+// ---------------------------------------------------------------------------
+// Element-Logik: Held-Resists/Schwächen + Element-Runen
+// ---------------------------------------------------------------------------
+
+// Held: starkes/schwaches Element → Faktor 0.5 / 2.0
 function elementalFactorFor(hero, element) {
   if (!hero || !element) return 1;
   let f = 1;
-  if (hero.weakElement && hero.weakElement === element)   f *= 2;   // schwach → doppelter Schaden
+  if (hero.weakElement && hero.weakElement === element)     f *= 2;   // schwach → doppelter Schaden
   if (hero.strongElement && hero.strongElement === element) f *= 0.5; // stark → halber Schaden
   return f;
 }
 
-function computeElementalDamage(base, element) {
+// Runen: +20 % Schaden pro passendem Element (bis zu deinen Slots)
+function elementDamageMultiplier(cardOrInst) {
+  const t = cardOrInst.tplId ? tplById(cardOrInst.tplId) : cardOrInst;
+  const elems = t.elements || [];
+
+  const runeState = GameState.runes || {};
+  const elemRunes = runeState.elements || {};
+
+  let matches = 0;
+  for (const e of elems) {
+    if (elemRunes[e]) matches++;
+  }
+  if (matches <= 0) return 1;
+
+  // pro passender Rune +20 %
+  return 1 + 0.2 * matches;
+}
+
+// finale Berechnung: Basis * (Held-Faktor) * (Runen-Faktor)
+function computeElementalDamage(base, element, cardOrInst = null) {
   const h = GameState.hero;
-  const factor = elementalFactorFor(h, element);
+  let factor = elementalFactorFor(h, element);
+
+  if (cardOrInst) {
+    factor *= elementDamageMultiplier(cardOrInst);
+  }
+
   return Math.max(0, Math.round(base * factor));
 }
 
@@ -34,8 +65,6 @@ function logElementHit(label, base, final, element) {
     log(`${label}: ${base}→${final} Schaden${elemTxt}.`);
   }
 }
-
-
 
 // ==============================
 // Library / Meta
@@ -57,27 +86,21 @@ function tplById(tplId) {
   return t;
 }
 
-
-// GANZ UNTEN (oder irgendwo nach tplById)
+/** Typ-Check: darf direkt auf den Helden gewirkt werden? */
 export function isHeroCard(inst) {
-  // inst → { uid, tplId, level }
   const t = tplById(inst.tplId);
-  // Nur diese Typen gehen direkt auf den Helden:
+  // nur direkte Heldentreffer-Typen:
   return t.type === "fluch" || t.type === "s_fluch";
 }
-
-
 
 // ==============================
 // Instanzen
 // ==============================
 
-/** Neue Karten-Instanz aus einer Vorlage erzeugen. */
 export function newInstance(tplId, level = 1) {
   return { uid: uid(), tplId, level };
 }
 
-/** Praktisch für Rendering: Template + Instanz-Daten zusammenführen. */
 export function instView(inst) {
   const t = tplById(inst.tplId);
   return { ...t, uid: inst.uid, level: inst.level };
@@ -87,13 +110,7 @@ export function instView(inst) {
 // Skalierung (linear / log / cap)
 // ==============================
 
-/**
- * Skaliert den Effektwert einer Karte anhand des Instanz-Levels.
- * Nimmt entweder eine Instanz {tplId, level} ODER direkt ein Template-Objekt
- * mit `effect` entgegen.
- */
 export function scaledValue(cardOrInst) {
-  // Template ermitteln
   const t = cardOrInst.tplId ? tplById(cardOrInst.tplId) : cardOrInst;
   const level = (cardOrInst.level || 1);
 
@@ -103,7 +120,6 @@ export function scaledValue(cardOrInst) {
     const val = e.base + Math.log1p(Math.max(0, level - 1)) * (e.growth || 0);
     return Math.min(val, cap);
   }
-  // linear
   return (e.base || 0) + (level - 1) * (e.growth || 0);
 }
 
@@ -119,7 +135,6 @@ const log = (msg) => _logCb?.(msg);
 // Ziehen / Mischen / Rotieren
 // ==============================
 
-/** Einfaches Fisher–Yates-Shuffle. */
 const shuffle = (a) => {
   a = [...a];
   for (let i = a.length - 1; i > 0; i--) {
@@ -129,23 +144,22 @@ const shuffle = (a) => {
   return a;
 };
 
-/** Zieht n Instanzen aus dem Deck (keine discard-Mechanik). */
 export function drawCards(n) {
   let drawn = 0;
   for (let i = 0; i < n; i++) {
-    if (GameState.hand.length >= 20) break;      // Handlimit (anpassbar)
-    if (GameState.deck.length === 0) break;      // nichts mehr da
+    if (GameState.hand.length >= 20) break;
+    if (GameState.deck.length === 0) break;
     const inst = GameState.deck.pop();
     GameState.hand.push(inst);
     drawn++;
   }
-  log(`<span class="small muted">gezogen: ${drawn} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}</span>`);
+  log(
+    `<span class="small muted">gezogen: ${drawn} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}</span>`
+  );
 }
 
-/** Legt eine Instanz zurück ins Deck und mischt leicht. */
 export function returnToDeck(inst) {
   GameState.deck.push(inst);
-  // leicht mischen – schnell & ausreichend für Prototyp
   GameState.deck = shuffle(GameState.deck);
 }
 
@@ -153,10 +167,6 @@ export function returnToDeck(inst) {
 // Opferung & Level-Up
 // ==============================
 
-/**
- * Entfernt EINE Instanz endgültig (Opferung).
- * @returns { ok: boolean }
- */
 export function sacrificeByUid(cardUid) {
   const remove = (arr) => {
     const i = arr.findIndex(c => c.uid === cardUid);
@@ -164,19 +174,13 @@ export function sacrificeByUid(cardUid) {
   };
   remove(GameState.hand);
   remove(GameState.deck);
-  remove(GameState.discard); // ungenutzt, aber harmless
+  remove(GameState.discard);
   return { ok: true };
 }
 
-/**
- * Kompatibler Helfer: Opfer von A und Level-Up auf B.
- * fromCardUid wird gelöscht; toCardUid +1 Level (falls vorhanden).
- */
 export function sacrifice(fromCardUid, toCardUid) {
-  // 1) Opfer entfernen
   sacrificeByUid(fromCardUid);
 
-  // 2) Ziel finden & leveln
   const findByUid = (uid) =>
     GameState.hand.find(c => c.uid === uid) ||
     GameState.deck.find(c => c.uid === uid) ||
@@ -191,12 +195,14 @@ export function sacrifice(fromCardUid, toCardUid) {
   return { ok: false };
 }
 
-/** Reines Level-Up per uid (optional) */
 export function levelUp(cardUid, delta = 1) {
   const all = [GameState.hand, GameState.deck, GameState.discard];
   for (const arr of all) {
     const c = arr.find(x => x.uid === cardUid);
-    if (c) { c.level = Math.max(1, (c.level || 1) + delta); return { ok: true, level: c.level }; }
+    if (c) {
+      c.level = Math.max(1, (c.level || 1) + delta);
+      return { ok: true, level: c.level };
+    }
   }
   return { ok: false };
 }
@@ -205,42 +211,34 @@ export function levelUp(cardUid, delta = 1) {
 // Karte spielen / platzieren
 // ==============================
 
-/**
- * Karte spielen.
- * - ohne targetNodeId: Sofort-Effekt (wirkt direkt auf den Helden)
- * - mit  targetNodeId: als „Falle/Zone“ auf der Map platzieren
- * In beiden Fällen: Instanz verlässt Hand und geht zurück ins Deck (rotierendes Deck).
- */
 export function playCard(inst, targetNodeId = null) {
-  // 1) Template holen & Kosten bezahlen
-  const t = inst.tplId ? tplById(inst.tplId) : inst; // Fail-safe: falls doch Template übergeben
+  const t = inst.tplId ? tplById(inst.tplId) : inst;
   const cost = t.cost ?? 0;
   if (GameState.energy < cost) return { ok: false, log: `Nicht genug Energie` };
   GameState.energy -= cost;
 
-  // 2) Platzieren auf Node
+  // Map-Platzierung (Fallen/Zonen)
   if (targetNodeId) {
     placeOnNode(inst, targetNodeId);
-    // Instanz aus Hand nehmen & zurück ins Deck
     GameState.hand = GameState.hand.filter(c => c.uid !== inst.uid);
     returnToDeck(inst);
     return { ok: true, log: `${t.name} wurde auf Feld platziert.` };
   }
 
-  // 3) Sofort-Effekt (vereinfacht, typisches Set an Effekten)
+  // Sofort-Effekt (Held direkt)
   const h = GameState.hero;
   const k = t.effect?.kind;
-  const val = Math.max(1, Math.floor(scaledValue(inst)));
+  const base = Math.max(1, Math.floor(scaledValue(inst)));
 
   if (k === "damage" || k === "aoe_damage") {
     const element = (t.elements && t.elements[0]) || null;
-    const final = computeElementalDamage(val, element);
+    const final   = computeElementalDamage(base, element, inst);
     h.hp = clamp(h.hp - final, 0, h.maxHp);
-    logElementHit(t.name, val, final, element);
+    logElementHit(t.name, base, final, element);
   } else if (k === "dot" || k === "bleed") {
     const element = (t.elements && t.elements[0]) || null;
-    h.dots.push({ dmg: val, days: 3, element });
-    log(`${t.name} DoT ${val} für 3T${element ? " (" + element + ")" : ""}.`);
+    h.dots.push({ dmg: base, days: 3, element });
+    log(`${t.name} DoT ${base} für 3T${element ? " (" + element + ")" : ""}.`);
   } else if (k === "freeze_days") {
     const d = Math.max(1, Math.round(scaledValue(inst)));
     h.status.frozenDays = (h.status.frozenDays || 0) + d;
@@ -255,7 +253,8 @@ export function playCard(inst, targetNodeId = null) {
     log(`${t.name}: Schwächung +${d}%.`);
   } else if (k === "reduce_maxhp") {
     const d = Math.max(1, Math.round(scaledValue(inst)));
-    h.maxHp = Math.max(1, h.maxHp - d); h.hp = Math.min(h.hp, h.maxHp);
+    h.maxHp = Math.max(1, h.maxHp - d);
+    h.hp = Math.min(h.hp, h.maxHp);
     log(`${t.name}: MaxHP -${d}.`);
   } else if (k === "gain_energy") {
     const d = Math.max(1, Math.round(scaledValue(inst)));
@@ -272,22 +271,20 @@ export function playCard(inst, targetNodeId = null) {
     log(`${t.name} gespielt (Platzhalter-Effekt).`);
   }
 
-  // 4) Instanz aus Hand & zurück ins Deck (rotierend)
   GameState.hand = GameState.hand.filter(c => c.uid !== inst.uid);
   returnToDeck(inst);
   return { ok: true };
 }
 
-/** Karte/Instanz als „Falle/Zone“ auf Node legen (Snapshot für Field-Trigger). */
 export function placeOnNode(inst, nodeId) {
   const t = tplById(inst.tplId);
   const list = GameState.placed.get(nodeId) || [];
   list.push({
-    uid: uid(),             // placement-id, NICHT die inst.uid!
-    instUid: inst.uid,      // referenz auf die Instanz (falls du später zurückfinden willst)
-    tplId: inst.tplId,      // Vorlage
-    level: inst.level,      // Level zum Zeitpunkt des Platzierens
-    once: true,             // einfache Falle: einmal auslösen → weg
+    uid: uid(),
+    instUid: inst.uid,
+    tplId: inst.tplId,
+    level: inst.level,
+    once: true,
     createdDay: GameState.day
   });
   GameState.placed.set(nodeId, list);
@@ -295,10 +292,9 @@ export function placeOnNode(inst, nodeId) {
 }
 
 // ==============================
-// Feld-Trigger
+// Field-Trigger
 // ==============================
 
-/** Löst alle platzierten Karten auf einem Node aus. */
 export function triggerNode(nodeId) {
   const entries = GameState.placed.get(nodeId);
   if (!entries || !entries.length) return;
@@ -308,21 +304,20 @@ export function triggerNode(nodeId) {
 
   entries.forEach(p => {
     const t = tplById(p.tplId);
-    // temporäre "virtuelle" Instanz für die Berechnung (Level zum Platzierzeitpunkt)
     const v = { tplId: p.tplId, level: p.level };
     const k = t.effect?.kind;
-    const val = Math.max(1, Math.floor(scaledValue(v)));
+    const base = Math.max(1, Math.floor(scaledValue(v)));
 
     if (k === "damage" || k === "aoe_damage") {
       const element = (t.elements && t.elements[0]) || null;
-      const final = computeElementalDamage(val, element);
+      const final   = computeElementalDamage(base, element, v);
       h.hp = clamp(h.hp - final, 0, h.maxHp);
-      logElementHit(`<b>Falle</b> ${t.name}`, val, final, element);
+      logElementHit(`<b>Falle</b> ${t.name}`, base, final, element);
     } else if (k === "dot" || k === "bleed") {
       const element = (t.elements && t.elements[0]) || null;
-      h.dots.push({ dmg: val, days: 3, element });
+      h.dots.push({ dmg: base, days: 3, element });
       log(
-        `<b>Zone</b> ${t.name} – DoT ${val} für 3T` +
+        `<b>Zone</b> ${t.name} – DoT ${base} für 3T` +
         (element ? ` (${element})` : "") +
         `.`
       );
@@ -332,7 +327,6 @@ export function triggerNode(nodeId) {
       else h.status.slowDays = (h.status.slowDays || 0) + d;
       log(`<b>Kontrolle</b> ${t.name} – ${d}T.`);
     } else {
-      // Fallback: „als Sofortkarte behandeln“ (selten nötig)
       const backup = GameState.energy;
       GameState.energy = 999;
       playCard({ tplId: p.tplId, level: p.level }, null);

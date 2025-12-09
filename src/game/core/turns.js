@@ -8,7 +8,7 @@
 //             • maxDays erreicht, Schloss NICHT erreicht → Sieg für dich
 // ============================================================================
 
-import { GameState, BASE_ENERGY, BASE_DRAW, clamp } from "./gameState.js";
+import { GameState, BASE_ENERGY, BASE_DRAW, clamp, RUN_DAYS  } from "./gameState.js";
 import { drawCards }   from "../cards/cards.js";
 import { triggerNode } from "../cards/cards.js";
 import { regenerateMap, renderMap } from "../map/map.js";
@@ -145,44 +145,62 @@ export function endDay() {
   }
 
   // --- 6) HELD-TOD: neue Runde, Tage zurück auf 1 ---
+ 
   if (h.hp <= 0 && h.alive !== false) {
     h.alive = false;
 
-    const gain = 3 + (GameState.runes?.soul ? 1 : 0);
+    // Basis-Beute
+    const baseSouls = 3;
+
+    // Bonus: je früher der Held fällt, desto mehr
+    // Beispiel: maxDays=10
+    // - stirbt an Tag 1  → earlyRaw = 9 → earlyBonus = 4
+    // - stirbt an Tag 5  → earlyRaw = 5 → earlyBonus = 2
+    // - stirbt an Tag 10 → earlyRaw = 0 → earlyBonus = 0
+    const maxDays   = GameState.maxDays || RUN_DAYS;
+    const dayNow    = GameState.day || 1;
+    const earlyRaw  = Math.max(0, maxDays - dayNow);
+    const earlyBonus = Math.floor(earlyRaw / 2); // alle 2 "ersparten" Tage = +1 Seele
+
+    // Rune-Bonus (+1, wenn r_soul aktiv)
+    const runeBonus = GameState.runes?.soul ? 1 : 0;
+
+    const gain = baseSouls + earlyBonus + runeBonus;
     GameState.souls += gain;
-    window.__toast?.(`<b>SIEG</b> – Held fällt (+${gain} Seelen)`);
+
+    window.__toast?.(
+      `<b>SIEG</b> – Held fällt (+${gain} Seelen: ${baseSouls} Basis, ${earlyBonus} früh, ${runeBonus} Rune)`
+    );
 
     // Runden-/Levelzähler hoch
     GameState.round = (GameState.round ?? 1) + 1;
 
-    // ❗ Tage für neuen Held zurücksetzen
     GameState.day = 1;
 
-    // neue Map für diese Runde
     try {
       regenerateMap(GameState.round);
     } catch (e) {
       console.error("[endDay] regenerateMap crashed → fallback", e);
-      // fallback: behalte alte Map
     }
 
-    // neuer Held aus heroes.de.json (über __spawnHero)
     if (typeof window.__spawnHero === "function") {
       window.__spawnHero(GameState.round);
     } else {
       fallbackSpawnHero();
     }
 
-    // neuer Held → wieder 3 Tage Camp
     GameState.campDays = 3;
 
-    // neuer Tag starten
     beginDay();
     renderMap?.();
-    window.__log?.(`<span class="small muted">Runde ${GameState.round} startet.</span>`);
+    window.__log?.(
+      `<span class="small muted">Runde ${GameState.round} startet. (+${gain} Seelen erhalten)</span>`
+    );
     console.log("[endDay] NEXT ROUND → Tag", GameState.day, "Round", GameState.round);
     return;
   }
+  
+  
 
   // --- 7) Normaler Tagwechsel (Held lebt, Schloss nicht erreicht) ---
   GameState.day++;
@@ -200,7 +218,7 @@ export function endDay() {
   beginDay();
   window.__toast?.(`Tag <b>${GameState.day}</b>`);
   console.log("[endDay] DONE → Tag", GameState.day);
-}
+} 
 
 // ============================================================================
 // Heldbewegung: 1 Schritt Richtung nächste "Schicht" (layer+1), zufälliger Pfad

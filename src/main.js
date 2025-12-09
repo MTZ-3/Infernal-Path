@@ -1,6 +1,6 @@
 // src/main.js
 import { GameState } from "./game/core/gameState.js";
-import { mountUI, render, bindLogs, showPortalOffer, showLobby } from "./ui/render.js";
+import { mountUI, render, bindLogs, showPortalOffer, showLobby, setRuneDefs, showRuneShop } from "./ui/render.js";
 import { setCardLibrary, newInstance } from "./game/cards/cards.js";
 import { createHero } from "./game/hero/hero.js";
 import { beginDay, endDay } from "./game/core/turns.js";
@@ -67,12 +67,30 @@ const FALLBACK_HEROES = [
   { id: "blutjaeger", name: "Der Blutjäger", maxHp: 90, baseSpeed: 1, passives: [] },
 ];
 
+const FALLBACK_RUNES = [
+  { id:"r_draw",   name:"+1 Karte pro Tag", cost:6, type:"meta",    apply:{ drawPerDay:1 } },
+  { id:"r_energy", name:"+1 Energie Start", cost:6, type:"meta",    apply:{ energy:1 } },
+  { id:"r_soul",   name:"+1 Seele pro Held", cost:8, type:"meta",   apply:{ soulOnKill:1 } },
+
+  { id:"r_feuer",   name:"Rune des Feuers",   cost:6, type:"element", element:"feuer",   apply:{ elementDamagePct:20 } },
+  { id:"r_blut",    name:"Rune des Blutes",   cost:6, type:"element", element:"blut",    apply:{ elementDamagePct:20 } },
+  { id:"r_schatten",name:"Rune der Schatten", cost:6, type:"element", element:"schatten",apply:{ elementDamagePct:20 } },
+  { id:"r_eis",     name:"Rune des Eises",    cost:6, type:"element", element:"eis",     apply:{ elementDamagePct:20 } },
+  { id:"r_natur",   name:"Rune der Natur",    cost:6, type:"element", element:"natur",   apply:{ elementDamagePct:20 } },
+  { id:"r_licht",   name:"Rune des Lichts",   cost:6, type:"element", element:"licht",   apply:{ elementDamagePct:20 } }
+];
+
+
 // === Async Boot ===
 const cards  = await loadJSON("./data/cards.de.json",  FALLBACK_CARDS);
 const heroes = await loadJSON("./data/heroes.de.json", FALLBACK_HEROES);
+const runes  = await loadJSON("./data/runes.de.json",  FALLBACK_RUNES);
 
 // Kartenbibliothek setzen
 setCardLibrary(cards);
+
+// Runen-Definitionen an UI weiterreichen
+setRuneDefs(runes);
 
 // Map montieren (Start-Layout, wird später von regenerateMap überschrieben)
 mountStaticMap(document.querySelector("#map"));
@@ -139,10 +157,9 @@ document.querySelector("#btn-end-day").onclick = () => {
 };
 
 document.querySelector("#btn-demon").onclick = () => {
-  const html = `<h2>Runen-Shop</h2><div class="small muted">Platzhalter</div>`;
-  document.querySelector("#overlay-inner").innerHTML = html;
-  document.querySelector("#overlay").style.display = "flex";
+  showRuneShop();
 };
+
 
 // ---------------------------------------------------------------------------
 // Run-Start: wird von Lobby aufgerufen (chosenTplIds = Array<string> card.id)

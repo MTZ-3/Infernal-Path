@@ -32,11 +32,25 @@ export const GameState = {
 
   // --- Held / Runen / temporäre Modifikatoren ---
   hero: null,                               // wird bei Run-Start via createHero() gesetzt
-  runes: {                                  // Meta-Boni, die beginDay/endDay beeinflussen
+    runes: {                                  // Meta-Boni, die beginDay/endDay beeinflussen
     draw:   false,                          // +1 Karte ziehen pro Tag (Beispiel)
     energy: false,                          // +1 Energie pro Tag (Beispiel)
-    soul:   false                           // +1 Seele je Kill (Beispiel)
+    soul:   false,                          // +1 Seele je Kill (Beispiel)
+
+    // Element-Runen: true = +20 % Schaden für dieses Element
+    elements: {
+      feuer:    false,
+      blut:     false,
+      schatten: false,
+      eis:      false,
+      natur:    false,
+      licht:    false,
+    },
+
+    // maximale Anzahl gleichzeitig ausgerüsteter Element-Runen
+    maxElementSlots: 3,
   },
+
   mods: {                                   // temporäre Multiplikatoren/Buffs
     cursePct:     0,                        // z. B. +% Fluchschaden
     tempDamagePct:0                         // temporäre +% auf Schaden

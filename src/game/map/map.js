@@ -283,7 +283,12 @@ export function forwardNeighbors(id) {
 // ============================================================================
 function onNodeClick(node) {
   const inst = GameState.targeting;
-  if (!inst) return; // keine Karte ausgewählt
+
+  // 🔍 Kein Target gewählt → Node inspizieren
+  if (!inst) {
+    inspectNode(node);
+    return;
+  }
 
   const view = instView(inst);
   const type = view.type;
@@ -311,6 +316,31 @@ function onNodeClick(node) {
     window.__log?.(res?.log || "Konnte hier nicht platzieren.");
   }
 }
+
+function inspectNode(node) {
+  const entries = GameState.placed.get(node.id) || [];
+
+  if (!entries.length) {
+    const kindTxt =
+      node.kind === "village" ? "Dorf" :
+      node.kind === "dungeon" ? "Dungeon" :
+      node.kind === "castle"  ? "Schloss" :
+      node.kind === "start"   ? "Start" :
+      "leeres Feld";
+    window.__log?.(`<span class="small muted">Feld: ${kindTxt} – hier liegt nichts.</span>`);
+    return;
+  }
+
+  const parts = entries.map(p => {
+    const v = instView({ tplId: p.tplId, level: p.level, uid: p.instUid });
+    return `${v.name} (L${v.level}, Typ ${v.type})`;
+  });
+
+  window.__log?.(
+    `<span class="small">Feld enthält: ${parts.join(" • ")}</span>`
+  );
+}
+
 
 // ============================================================================
 // Interaktion: Karte direkt auf den Helden wirken

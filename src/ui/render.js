@@ -3,16 +3,30 @@
 // UI für "Infernal Path"
 // - Layout: Topbar, Map links, Hand unten, Log rechts
 // - Logs & Toasts
-// - Hand-Rendering (INSTANZEN, nicht Templates!)
-// - Lobby (Deck-Auswahl 10 Karten)
-// - Portal (jeden Tag 3 Karten → 1 wählen → ins Deck, mischen, ziehen)
+// - Hand-Rendering (Instanzen!)
+// - Lobby (Deck-Auswahl)
+// - Portal
+// - Opferaltar & Deck-Übersicht
+// - Runen-Panel + Runen-Shop
 // ============================================================================
 
-import { GameState, BASE_ENERGY, BASE_DRAW } from "../game/core/gameState.js";
-import {playCard,instView ,newInstance ,drawCards ,sacrifice ,bindLogger as bindCardLogger, scaledValue} from "../game/cards/cards.js";
+import { GameState, BASE_ENERGY, BASE_DRAW} from "../game/core/gameState.js";
+import { playCard, instView, newInstance, drawCards, sacrifice, bindLogger as bindCardLogger, scaledValue} from "../game/cards/cards.js";
 import { renderMap } from "../game/map/map.js";
 
-// Kleine Helper: Element-Badges für Karten
+// ============================================================================
+// Kleine Helper
+// ============================================================================
+
+// Laufzeit-Runendaten aus runes.de.json
+let RUNE_DEFS = [];
+
+/** Wird von main.js nach dem JSON-Load aufgerufen. */
+export function setRuneDefs(list) {
+  RUNE_DEFS = Array.isArray(list) ? list : [];
+}
+
+
 function elementsHtml(arr) {
   if (!arr || !arr.length) return "";
   return `<div class="elems">${arr
@@ -20,27 +34,61 @@ function elementsHtml(arr) {
     .join("")}</div>`;
 }
 
-let logBox;
+/**
+ * Effekt-Vorschau für eine Instanz – OHNE Runen/Element-Vulnerability,
+ * damit die Karte einen stabilen „Basiswert“ zeigt.
+ */
+function effectPreviewFromInst(inst) {
+  const v = instView(inst);
+  const e = v.effect || {};
+  const kind = e.kind;
+  if (!kind) return "";
 
-// Platzierungs-Typ basierend auf der TEMPLATE-View
-// Rückgabe: "hero" | "special" | "road"
-function placementForView(v) {
-  const type = v.type;
-  const kind = v.effect?.kind || "";
+  const val = Math.max(1, Math.floor(scaledValue(inst)));
 
-  if (type === "eroberung") {
-    if (kind.includes("village") || kind.startsWith("dungeon_")) {
-      return "special";
-    }
-    return "road";
+  if (kind === "damage" || kind === "aoe_damage") {
+    return `Schaden: ${val}`;
   }
-  return "hero";
+  if (kind === "dot" || kind === "bleed") {
+    return `DoT: ${val}/Tag`;
+  }
+  if (kind === "freeze_days") {
+    return `Einfrieren: ${val}T`;
+  }
+  if (kind === "slow_move_days") {
+    return `Verlangsamung: ${val}T`;
+  }
+  if (kind === "weaken") {
+    return `Schwächung: ${val}%`;
+  }
+  if (kind === "reduce_maxhp") {
+    return `MaxHP -${val}`;
+  }
+  if (kind === "gain_souls") {
+    return `+${val} Seelen`;
+  }
+  if (kind === "gain_energy") {
+    return `+${val} Energie`;
+  }
+
+  return "";
 }
 
+/** Vorschau für Templates (z.B. Portal / Deck-Übersicht). */
+function effectPreviewFromTemplate(t, level = 1) {
+  const fakeInst = { tplId: t.id, level };
+  return effectPreviewFromInst(fakeInst);
+}
+
+
+const MAX_ELEMENT_RUNES = 3;
+
+let logBox;
 
 // ============================================================================
 // Grundlayout aufbauen
 // ============================================================================
+
 export function mountUI(app) {
   app.innerHTML = `
     <div id="top-bar">
@@ -68,14 +116,13 @@ export function mountUI(app) {
   logBox = document.querySelector("#log");
 
   const altar = document.querySelector("#altar");
-  if (altar) {
-    altar.addEventListener("click", onAltarClick);
-  }
+  if (altar) altar.addEventListener("click", onAltarClick);
 }
 
 // ============================================================================
 // Logs, Render-Hooks, Toasts
 // ============================================================================
+
 export function bindLogs() {
   // Normaler Log
   window.__log = (msg) => log(msg);
@@ -92,7 +139,6 @@ export function bindLogs() {
     t.className = "toast";
     t.innerHTML = html;
     document.body.appendChild(t);
-    // kleiner Fade-In
     requestAnimationFrame(() => t.classList.add("show"));
     setTimeout(() => {
       t.classList.remove("show");
@@ -105,18 +151,58 @@ function log(msg) {
   if (!logBox) return;
   const div = document.createElement("div");
   div.innerHTML = msg;
-  // Neue Logs OBEN einfügen:
+  // neue Logs OBEN einfügen
   if (logBox.firstChild) {
     logBox.insertBefore(div, logBox.firstChild);
   } else {
     logBox.appendChild(div);
   }
-  // Immer oben bleiben (neuste Meldung sichtbar)
   logBox.scrollTop = 0;
 }
 
 // ============================================================================
-// Opferaltar)
+// Runen-Panel (unter der Map)
+// ============================================================================
+
+function renderRunesPanel() {
+  const box = document.querySelector("#runes");
+  if (!box) return;
+
+  const runes = GameState.runes || {};
+  const elems = runes.elements || {};
+  const active = Object.entries(elems).filter(([, v]) => v);
+
+  if (!active.length) {
+    box.innerHTML = `<div class="panel small muted">Keine Element-Runen aktiv.</div>`;
+    return;
+  }
+
+  const iconMap = {
+    feuer: "🔥",
+    blut: "🩸",
+    schatten: "🌑",
+    eis: "❄️",
+    natur: "🌿",
+    licht: "✨",
+  };
+
+  box.innerHTML = `
+    <div class="panel small">
+      <div class="row"><b>Aktive Runen</b></div>
+      <div class="row" style="flex-wrap:wrap;gap:6px">
+        ${active
+          .map(
+            ([el]) =>
+              `<span class="pill">${iconMap[el] || ""} ${el} +20%</span>`
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+// ============================================================================
+// Opferaltar
 // ============================================================================
 
 function onAltarClick() {
@@ -124,33 +210,44 @@ function onAltarClick() {
   const hand = s.hand;
 
   if (!hand.length) {
-    window.__log?.("Du hast keine Karten in der Hand, die du opfern könntest.");
+    window.__log?.(
+      "Du hast keine Karten in der Hand, die du opfern könntest."
+    );
     return;
   }
 
   const sac = s.targeting;
   if (!sac) {
-    window.__log?.("Wähle zuerst die Karte in deiner Hand, die du opfern willst, und klicke dann auf den Opferaltar.");
+    window.__log?.(
+      "Wähle zuerst die Karte in deiner Hand, die du opfern willst, und klicke dann auf den Opferaltar."
+    );
     return;
   }
 
   if (hand.length < 2) {
-    window.__log?.("Du brauchst mindestens eine weitere Karte in der Hand, die verstärkt werden kann.");
+    window.__log?.(
+      "Du brauchst mindestens eine weitere Karte in der Hand, die verstärkt werden kann."
+    );
     return;
   }
 
   if (s.energy <= 0) {
-    window.__log?.("Du hast nicht genug Energie für ein Opfer (kostet 1 Energie).");
+    window.__log?.(
+      "Du hast nicht genug Energie für ein Opfer (kostet 1 Energie)."
+    );
     return;
   }
 
-  const candidates = hand.filter(c => c.uid !== sac.uid);
+  const candidates = hand.filter((c) => c.uid !== sac.uid);
   if (!candidates.length) {
-    window.__log?.("Keine andere Karte in der Hand zum Verstärken gefunden.");
+    window.__log?.(
+      "Keine andere Karte in der Hand zum Verstärken gefunden."
+    );
     return;
   }
 
-  const target = candidates[Math.floor(Math.random() * candidates.length)];
+  const target =
+    candidates[Math.floor(Math.random() * candidates.length)];
 
   // Energie zahlen
   s.energy -= 1;
@@ -158,16 +255,15 @@ function onAltarClick() {
   const res = sacrifice(sac.uid, target.uid);
 
   if (res?.ok) {
-    // geopferte Karte aus der Hand entfernen
-    s.hand = s.hand.filter(c => c.uid !== sac.uid);
+    s.hand = s.hand.filter((c) => c.uid !== sac.uid);
 
-    const viewSac    = instView(sac);
+    const viewSac = instView(sac);
     const viewTarget = instView(target);
 
     window.__log?.(
       `<span class="soul">Opferung</span>: <b>${viewSac.name}</b> wurde geopfert. ` +
-      `<b>${viewTarget.name}</b> steigt auf L${target.level}. ` +
-      `(Energie jetzt ${s.energy})`
+        `<b>${viewTarget.name}</b> steigt auf L${target.level}. ` +
+        `(Energie jetzt ${s.energy})`
     );
 
     s.targeting = null;
@@ -177,10 +273,10 @@ function onAltarClick() {
   }
 }
 
+// ============================================================================
+// Haupt-Renderfunktion: Stats + Hand
+// ============================================================================
 
-// ============================================================================
-// Haupt-Renderfunktion: Stats + Hand (INSTANZEN!)
-// ============================================================================
 export function render() {
   const s = GameState;
   const stats = document.querySelector("#stats");
@@ -190,13 +286,12 @@ export function render() {
   let heroStatus = "kein Held";
   if (h) {
     const strong = h.strongElement ? `🔺${h.strongElement}` : "";
-    const weak   = h.weakElement   ? `🔻${h.weakElement}` : "";
-   const tags   = [strong, weak].filter(Boolean).join(" ");
+    const weak = h.weakElement ? `🔻${h.weakElement}` : "";
+    const tags = [strong, weak].filter(Boolean).join(" ");
     heroStatus = `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${
       h.alive !== false ? "Lebt" : "Tot"
     }${tags ? " • " + tags : ""}`;
   }
-
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
@@ -204,36 +299,45 @@ export function render() {
     Energie: ${s.energy}/${BASE_ENERGY} |
     Seelen: ${s.souls} |
     Hand: ${s.hand.length} |
-    <span id="stat-deck" class="k" style="cursor:pointer">Deck: ${s.deck.length}</span> |
+    <span id="stat-deck" class="k" style="cursor:pointer">Deck: ${
+      s.deck.length
+    }</span> |
     ${heroStatus}
   `;
 
   const deckEl = document.querySelector("#stat-deck");
-  if (deckEl) {
-    deckEl.onclick = () => openDeckBrowser();
-  }
+  if (deckEl) deckEl.onclick = () => openDeckBrowser();
 
-  // Hand zeichnen (INSTANZEN → instView)
+  // Runen-Panel
+  renderRunesPanel();
+
+  // Hand
   const hand = document.querySelector("#hand");
   hand.innerHTML = "";
   s.hand.forEach((inst) => {
-    const c = instView(inst); // { name, type, desc, elements, cost, ... }
+    const c = instView(inst);
+
+    const preview = effectPreviewFromInst(inst);
 
     const div = document.createElement("div");
     div.className = "card";
     div.draggable = true;
     div.innerHTML = `
-        <div class="cost">L${inst.level || 1}</div>
-        <div class="badge">${c.type}</div>
-        <div class="name">${c.name}</div>
-        <div class="desc small">${c.desc}</div>
-        ${elementsHtml(c.elements || [])}
-      `;
+      <div class="cost">L${inst.level || 1}</div>
+      <div class="badge">${c.type}</div>
+      <div class="name">${c.name}</div>
+      <div class="desc small">${c.desc}</div>
+      ${
+        preview
+          ? `<div class="mini small muted">${preview}</div>`
+          : ""
+      }
+      ${elementsHtml(c.elements || [])}
+    `;
     div.onclick = () => {
-    if (s.targeting === inst) {
-      // Nochmal draufklicken = abwählen
-      s.targeting = null;
-      log(`Auswahl aufgehoben.`);
+      if (s.targeting === inst) {
+        s.targeting = null;
+        log(`Auswahl aufgehoben.`);
       } else {
         s.targeting = inst;
         log(`Karte gewählt: ${c.name} (L${inst.level || 1})`);
@@ -243,12 +347,12 @@ export function render() {
 
     hand.appendChild(div);
   });
-
 }
 
 // ============================================================================
-// Overlay-Helfer (Lobby, Portal, Shop nutzen das gleiche Overlay)
+// Overlay-Helfer
 // ============================================================================
+
 export function openOverlay() {
   const ov = document.querySelector("#overlay");
   if (!ov) return;
@@ -267,9 +371,9 @@ export function closeOverlay() {
 }
 
 // ============================================================================
-// PORTAL: Jeden Tag 3 Karten, 1 wählen → Instanz ins Deck → mischen → ziehen
+// PORTAL
 // ============================================================================
-// Wird von main.js via window.__portalDaily(drawCount) aufgerufen.
+
 export function showPortalOffer(cards, drawCount = BASE_DRAW) {
   const overlay = document.querySelector("#overlay");
   const inner = document.querySelector("#overlay-inner");
@@ -280,7 +384,7 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
   const round = GameState.round ?? 1;
   const level = round;
 
-  const picks = shuffleArray(cards).slice(0, 3); // Template-Vorlagen
+  const picks = shuffleArray(cards).slice(0, 3);
   inner.innerHTML = `
     <h2>Portal öffnet sich</h2>
     <p>Wähle 1 Karte. Danach wird deine Tageshand gezogen.</p>
@@ -290,6 +394,7 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
   const grid = inner.querySelector("#portal-grid");
 
   picks.forEach((tpl) => {
+    const preview = effectPreviewFromTemplate(tpl, level);
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
@@ -297,24 +402,21 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
       <div class="badge">${tpl.type}</div>
       <div class="name">${tpl.name}</div>
       <div class="desc small">${tpl.desc}</div>
+      ${
+        preview
+          ? `<div class="mini small muted">${preview}</div>`
+          : ""
+      }
       ${elementsHtml(tpl.elements || [])}
     `;
 
     div.onclick = () => {
       try {
-        // 1) Instanz aus Template erzeugen (perfekt integriert mit deinem Card-System)
         const inst = newInstance(tpl.id, level);
-
-        // 2) Ins Deck legen
         GameState.deck.push(inst);
-
-        // 3) Deck mischen
         shuffleInPlace(GameState.deck);
-
-        // 4) Overlay schließen
         closeOverlay();
 
-        // 5) Tageshand ziehen
         drawCards(drawCount);
 
         window.__log?.(
@@ -336,21 +438,26 @@ export function showPortalOffer(cards, drawCount = BASE_DRAW) {
 
 // ============================================================================
 // LOBBY / DECK-EDITOR
-// - Spieler wählt exakt 10 Karten (nach card.id, also Templates)
-// - "Zufällige 10", "Leeren", Filter nach Typ, Suche
-// - "Run starten" → window.__startRun(selectedIds)
 // ============================================================================
+
 export function showLobby(allCards) {
   const ov = document.querySelector("#overlay");
   const inner = document.querySelector("#overlay-inner");
   openOverlay();
 
-  // Lokaler State
-  const selected = new Set(); // genau 10 card.id
-  let q = ""; // Suche
+  const selected = new Set();
+  let q = "";
   let filterType = "alle";
 
-  const TYPES = ["alle", "fluch", "kontrolle", "daemon", "ritual", "eroberung", "spezial"];
+  const TYPES = [
+    "alle",
+    "fluch",
+    "kontrolle",
+    "daemon",
+    "ritual",
+    "eroberung",
+    "spezial",
+  ];
 
   const draw = () => {
     inner.innerHTML = `
@@ -373,7 +480,6 @@ export function showLobby(allCards) {
       </div>
     `;
 
-    // Typ-Filter-Pills
     const typesEl = inner.querySelector("#lobby-types");
     TYPES.forEach((t) => {
       const b = document.createElement("button");
@@ -386,7 +492,6 @@ export function showLobby(allCards) {
       typesEl.appendChild(b);
     });
 
-    // Suche
     const search = inner.querySelector("#lobby-search");
     search.value = q;
     search.oninput = (e) => {
@@ -394,11 +499,14 @@ export function showLobby(allCards) {
       renderGrid();
     };
 
-    // Buttons
     inner.querySelector("#btn-random10").onclick = () => {
       selected.clear();
       const shuffled = shuffleArray(allCards);
-      for (let i = 0; i < shuffled.length && selected.size < 10; i++) {
+      for (
+        let i = 0;
+        i < shuffled.length && selected.size < 10;
+        i++
+      ) {
         selected.add(shuffled[i].id);
       }
       draw();
@@ -412,12 +520,11 @@ export function showLobby(allCards) {
     inner.querySelector("#btn-start").onclick = () => {
       if (selected.size !== 10) return;
       closeOverlay();
-      window.__startRun?.(Array.from(selected)); // → main.js
+      window.__startRun?.(Array.from(selected));
     };
 
     inner.querySelector("#btn-close").onclick = closeOverlay;
 
-    // Karten-Grid rendern
     renderGrid();
   };
 
@@ -437,6 +544,7 @@ export function showLobby(allCards) {
 
     filtered.forEach((c) => {
       const sel = selected.has(c.id);
+      const preview = effectPreviewFromTemplate(c, 1);
       const div = document.createElement("div");
       div.className = "card pick" + (sel ? " selected" : "");
       div.innerHTML = `
@@ -445,6 +553,11 @@ export function showLobby(allCards) {
         <div class="name">${c.name}</div>
         <div class="mini">${c.id}</div>
         <div class="desc small">${c.desc}</div>
+        ${
+          preview
+            ? `<div class="mini small muted">${preview}</div>`
+            : ""
+        }
         ${elementsHtml(c.elements || [])}
       `;
       div.onclick = () => {
@@ -462,16 +575,166 @@ export function showLobby(allCards) {
   draw();
 }
 
-function openDeckBrowser() {
+// ============================================================================
+// Runen-Shop
+// ============================================================================
+
+export function showRuneShop() {
   const ov    = document.querySelector("#overlay");
   const inner = document.querySelector("#overlay-inner");
   if (!ov || !inner) return;
 
   openOverlay();
 
-  const deckViews = GameState.deck.map(inst => instView(inst));
+  const runeState = GameState.runes || {};
+  const elemRunes = runeState.elements || {};
+  const souls     = GameState.souls ?? 0;
 
-  // gleiche Vorlagen zusammenfassen (Anzahl anzeigen)
+  const elementRunes = RUNE_DEFS.filter(r => r.type === "element");
+  const metaRunes    = RUNE_DEFS.filter(r => r.type === "meta");
+
+  inner.innerHTML = `
+    <div class="lobby-wrap">
+      <div class="lobby-head">
+        <h2>Runen-Shop</h2>
+        <div class="lobby-tools">
+          <span class="lobby-counter">Seelen: ${souls}</span>
+          <button id="btn-close-shop" class="warn">Schließen</button>
+        </div>
+      </div>
+      <div class="lobby-grid" id="rune-grid"></div>
+    </div>
+  `;
+
+  const grid = inner.querySelector("#rune-grid");
+
+  const equippedCount = Object.values(elemRunes).filter(Boolean).length;
+  const maxSlots = runeState.maxElementSlots ?? 3;
+
+  // ---------- Element-Runen ----------
+  elementRunes.forEach((r) => {
+    const owned = !!elemRunes[r.element];
+    const canEquipMore = equippedCount < maxSlots;
+    const affordable   = souls >= r.cost;
+    const disabled     = owned || !canEquipMore || !affordable;
+
+    const div = document.createElement("div");
+    div.className = "card shop-card";
+    div.innerHTML = `
+      <div class="badge">${r.element || ""}</div>
+      <div class="name">${r.name}</div>
+      <div class="mini">+${r.apply?.elementDamagePct ?? 20}% Schaden für ${r.element}-Karten</div>
+      <div class="desc small">Kosten: ${r.cost} Seelen</div>
+      <div class="desc small ${owned ? "k" : "muted"}">
+        ${
+          owned
+            ? "Ausgerüstet"
+            : canEquipMore
+            ? ""
+            : "Max. " + maxSlots + " Element-Runen ausgerüstet"
+        }
+      </div>
+      <button class="primary" ${disabled ? "disabled" : ""}>Kaufen</button>
+    `;
+
+    const btn = div.querySelector("button");
+    btn.onclick = () => {
+      if (disabled) return;
+      if (GameState.souls < r.cost) {
+        window.__log?.("Nicht genug Seelen.");
+        return;
+      }
+
+      const elemsLocal =
+        GameState.runes.elements ||
+        (GameState.runes.elements = {});
+      const alreadyEquipped = Object.values(elemsLocal).filter(Boolean).length;
+
+      if (alreadyEquipped >= maxSlots) {
+        window.__log?.(
+          "Du kannst nur " + maxSlots + " Element-Runen gleichzeitig tragen."
+        );
+        return;
+      }
+
+      GameState.souls -= r.cost;
+      elemsLocal[r.element] = true;
+
+      window.__log?.(
+        `<span class="k">Rune gekauft</span>: ${r.name} (+${r.apply?.elementDamagePct ?? 20}% ${r.element}-Schaden).`
+      );
+      render();
+      showRuneShop();
+    };
+
+    grid.appendChild(div);
+  });
+
+  // ---------- Meta-Runen (draw/energy/soul) ----------
+  metaRunes.forEach((r) => {
+    const div = document.createElement("div");
+    div.className = "card shop-card";
+    const ownedKey =
+      r.apply?.drawPerDay ? "draw" :
+      r.apply?.energy     ? "energy" :
+      r.apply?.soulOnKill ? "soul" : null;
+
+    const owned = ownedKey ? !!GameState.runes[ownedKey] : false;
+    const affordable = souls >= r.cost;
+    const disabled = owned || !affordable;
+
+    div.innerHTML = `
+      <div class="badge">Meta</div>
+      <div class="name">${r.name}</div>
+      <div class="desc small">Kosten: ${r.cost} Seelen</div>
+      <div class="desc small ${owned ? "k" : "muted"}">
+        ${owned ? "Aktiv" : ""}
+      </div>
+      <button class="primary" ${disabled ? "disabled" : ""}>Kaufen</button>
+    `;
+
+    const btn = div.querySelector("button");
+    btn.onclick = () => {
+      if (disabled) return;
+      if (GameState.souls < r.cost) {
+        window.__log?.("Nicht genug Seelen.");
+        return;
+      }
+
+      GameState.souls -= r.cost;
+
+      if (r.apply?.drawPerDay) GameState.runes.draw   = true;
+      if (r.apply?.energy)     GameState.runes.energy = true;
+      if (r.apply?.soulOnKill) GameState.runes.soul   = true;
+
+      window.__log?.(
+        `<span class="k">Rune gekauft</span>: ${r.name}.`
+      );
+      render();
+      showRuneShop();
+    };
+
+    grid.appendChild(div);
+  });
+
+  const btnClose = inner.querySelector("#btn-close-shop");
+  if (btnClose) btnClose.onclick = () => closeOverlay();
+}
+
+
+// ============================================================================
+// Deck-Übersicht
+// ============================================================================
+
+function openDeckBrowser() {
+  const ov = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  if (!ov || !inner) return;
+
+  openOverlay();
+
+  const deckViews = GameState.deck.map((inst) => instView(inst));
+
   const byId = new Map();
   for (const v of deckViews) {
     const key = v.tplId || v.id;
@@ -493,7 +756,8 @@ function openDeckBrowser() {
   `;
 
   const grid = inner.querySelector("#deck-grid");
-  byId.forEach(v => {
+  byId.forEach((v) => {
+    const preview = effectPreviewFromTemplate(v, v.level || 1);
     const div = document.createElement("div");
     div.className = "card";
     div.innerHTML = `
@@ -503,23 +767,24 @@ function openDeckBrowser() {
       <div class="mini">${v.id || v.tplId}</div>
       <div class="desc small">${v.desc || ""}</div>
       ${v.count > 1 ? `<div class="badge">×${v.count}</div>` : ""}
+      ${
+        preview
+          ? `<div class="mini small muted">${preview}</div>`
+          : ""
+      }
       ${elementsHtml(v.elements || [])}
     `;
     grid.appendChild(div);
   });
 
   const btnClose = inner.querySelector("#deck-close");
-  if (btnClose) {
-    btnClose.onclick = () => {
-      closeOverlay();
-    };
-  }
+  if (btnClose) btnClose.onclick = () => closeOverlay();
 }
 
+// ============================================================================
+// Utilities
+// ============================================================================
 
-// ============================================================================
-// Lokale Utility-Funktionen
-// ============================================================================
 function shuffleArray(a) {
   a = [...a];
   for (let i = a.length - 1; i > 0; i--) {
@@ -529,7 +794,6 @@ function shuffleArray(a) {
   return a;
 }
 
-// In-Place-Shuffle, z.B. fürs Deck
 function shuffleInPlace(a) {
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -537,3 +801,4 @@ function shuffleInPlace(a) {
   }
   return a;
 }
+
