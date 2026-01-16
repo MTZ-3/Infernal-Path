@@ -1,149 +1,1189 @@
 [
   {
-    "id": "feuerstoss",
-    "name": "Feuerstoß",
-    "type": "fluch",
-    "elements": ["feuer"],
-    "cost": 1,
+    "id": "passiv_feuerverstaerker",
+    "name": "Feuerverstärker",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
     "effect": {
-      "kind": "damage",
+      "kind": "passive_elem_pct",
       "scaleType": "linear",
-      "base": 5,
-      "growth": 0.5
+      "base": 25,
+      "growth": 0,
+      "element": "feuer"
     },
-    "desc": "Direkter Fluch: Verursacht sofort Feuerschaden am Helden."
+    "desc": "+25 % Feuerschaden",
+    "lore": "Alte Runen nähren jede Flamme mit dämonischer Glut."
   },
   {
-    "id": "eisiger_blick",
-    "name": "Eisiger Blick",
-    "type": "fluch",
-    "elements": ["eis"],
-    "cost": 1,
+    "id": "passiv_blutverstaerker",
+    "name": "Blutverstärker",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
     "effect": {
-      "kind": "freeze_days",
-      "scaleType": "log",
+      "kind": "passive_elem_pct",
+      "scaleType": "linear",
+      "base": 25,
+      "growth": 0,
+      "element": "blut"
+    },
+    "desc": "+25 % Blut-/Bleed-Schaden",
+    "lore": "Das Blut der Opfer fließt schneller."
+  },
+  {
+    "id": "passiv_schattenverstaerker",
+    "name": "Schattenverstärker",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
+    "effect": {
+      "kind": "passive_elem_pct",
+      "scaleType": "linear",
+      "base": 25,
+      "growth": 0,
+      "element": "schatten"
+    },
+    "desc": "+25 % Schattenschaden",
+    "lore": "Die Dunkelheit lernt, tiefer zu schneiden."
+  },
+  {
+    "id": "passiv_eisverstaerker",
+    "name": "Eisverstärker",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
+    "effect": {
+      "kind": "passive_elem_pct",
+      "scaleType": "linear",
+      "base": 25,
+      "growth": 0,
+      "element": "eis"
+    },
+    "desc": "+25 % Eisschaden (kein Freeze)",
+    "lore": "Kälte ohne Gnade, aber ohne Stillstand."
+  },
+  {
+    "id": "passiv_elementare_ueberladung",
+    "name": "Elementare Überladung",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
+    "effect": {
+      "kind": "passive_per_element_pct",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 0
+    },
+    "desc": "+10 % Schaden pro Element",
+    "lore": "Je mehr Mächte, desto größer der Zorn."
+  },
+  {
+    "id": "passiv_qual_verlaengern",
+    "name": "Qual verlängern",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
+    "effect": {
+      "kind": "passive_dot_pct",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 0
+    },
+    "desc": "+10 % DoT-Schaden",
+    "lore": "Leiden soll dauern."
+  },
+  {
+    "id": "passiv_langsamer_verfall",
+    "name": "Langsamer Verfall",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
+    "effect": {
+      "kind": "passive_dot_days",
+      "scaleType": "linear",
       "base": 1,
-      "growth": 0.6,
-      "cap": 3
+      "growth": 0
     },
-    "desc": "Direkter Fluch: Friert den Helden für einige Tage ein."
+    "desc": "DoTs +1 Tag",
+    "lore": "Der Tod kommt schleichend."
   },
-
   {
-    "id": "schattenriss",
-    "name": "Schattenriss",
-    "type": "s_fluch",
-    "elements": ["schatten"],
-    "cost": 1,
+    "id": "passiv_tod_riecht_blut",
+    "name": "Tod riecht Blut",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
     "effect": {
-      "kind": "weaken",
-      "scaleType": "log",
-      "base": 2,
-      "growth": 0.6,
-      "cap": 4
-    },
-    "desc": "Sonder-Fluch: Schwächt den Helden, seine Angriffe werden wirkungsloser."
-  },
-
-  {
-    "id": "feuerfalle",
-    "name": "Feuerfalle",
-    "type": "falle",
-    "elements": ["feuer"],
-    "cost": 1,
-    "effect": {
-      "kind": "damage",
+      "kind": "passive_lowhp_taken_pct",
       "scaleType": "linear",
-      "base": 3,
-      "growth": 0.4
+      "base": 20,
+      "growth": 0,
+      "threshold": 0.3
     },
-    "desc": "Falle: Verursacht Feuerschaden, wenn der Held dieses Feld betritt."
+    "desc": "+20 % Schaden unter 30 % HP",
+    "lore": "Wenn Blut fließt, wittern Dämonen Beute."
   },
   {
-    "id": "dornenfalle",
-    "name": "Dornenfalle",
-    "type": "falle",
-    "elements": ["natur"],
-    "cost": 1,
+    "id": "passiv_blick_in_die_seele",
+    "name": "Blick in die Seele",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 8,
     "effect": {
-      "kind": "damage",
+      "kind": "passive_reveal",
       "scaleType": "linear",
-      "base": 3,
-      "growth": 0.4
+      "base": 1,
+      "growth": 0
     },
-    "desc": "Falle: Naturschaden beim Betreten – jeder Schritt reißt die Wunden weiter auf."
+    "desc": "Deckt 1 Eigenschaft auf",
+    "lore": "Ein Blick genügt."
   },
-
   {
-    "id": "blutpfuhl",
-    "name": "Blutpfuhl",
-    "type": "s_falle",
-    "elements": ["blut", "schatten"],
+    "id": "passiv_seelenfaenger",
+    "name": "Seelenfänger",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 15,
+    "effect": {
+      "kind": "passive_souls_pct",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 0
+    },
+    "desc": "+10 % Seelen",
+    "lore": "Keine Seele entkommt dem Abgrund."
+  },
+  {
+    "id": "passiv_karten_ziehen",
+    "name": "Karten ziehen",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 15,
+    "effect": {
+      "kind": "passive_draw",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0
+    },
+    "desc": "+1 Handkarte",
+    "lore": "Mehr Wissen, mehr Verderben."
+  },
+  {
+    "id": "passiv_opfergabe",
+    "name": "Opfergabe",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 25,
+    "effect": {
+      "kind": "passive_sacrifice_level",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0
+    },
+    "desc": "+1 Level bei Opferung",
+    "lore": "Blut stärkt Blut."
+  },
+  {
+    "id": "passiv_shop_erweitert",
+    "name": "Shop erweitert",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 15,
+    "effect": {
+      "kind": "passive_shop_slots",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0
+    },
+    "desc": "+1 Shop-Karte",
+    "lore": "Mehr Auswahl aus der Verdammnis."
+  },
+  {
+    "id": "passiv_gratis_aktualisierung",
+    "name": "Gratis Aktualisierung",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 15,
+    "effect": {
+      "kind": "passive_free_reroll",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0
+    },
+    "desc": "+1 kostenloses Reroll",
+    "lore": "Schicksal lässt sich drehen."
+  },
+  {
+    "id": "passiv_schwarze_vorbereitung",
+    "name": "Schwarze Vorbereitung",
+    "type": "passiv",
+    "elements": [],
+    "shopCost": 25,
+    "effect": {
+      "kind": "passive_energy",
+      "scaleType": "linear",
+      "base": 1,
+      "growth": 0
+    },
+    "desc": "+1 Energie zu Tagesbeginn",
+    "lore": "Der Dämon plant voraus."
+  },
+  {
+    "id": "trap_blutstacheln",
+    "name": "Blutstacheln",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
     "cost": 1,
     "effect": {
       "kind": "dot",
       "scaleType": "linear",
-      "base": 1,
-      "growth": 0.3
-    },
-    "desc": "Sonder-Falle: Erzeugt eine Zone, die den Helden über mehrere Tage schwächt und bluten lässt."
-  },
-
-  {
-    "id": "verfluchtes_dorf",
-    "name": "Verfluchtes Dorf",
-    "type": "dorf",
-    "elements": ["schatten", "blut"],
-    "cost": 1,
-    "effect": {
-      "kind": "dot",
-      "scaleType": "linear",
       "base": 2,
-      "growth": 0.3
+      "growth": 0.5,
+      "days": 2
     },
-    "desc": "Dorf-Karte: Nur auf Dörfer spielbar. Beim Betreten erleidet der Held über mehrere Tage Schaden."
+    "desc": "Schaden + Bleed",
+    "lore": "Aus Leibern gewachsen, die nie entkommen sind."
   },
   {
-    "id": "blutzehnt",
-    "name": "Blutzehnt",
-    "type": "dorf",
-    "elements": ["blut"],
+    "id": "trap_feuergraben",
+    "name": "Feuergraben",
+    "type": "falle",
+    "elements": [
+      "feuer"
+    ],
     "cost": 1,
     "effect": {
-      "kind": "gain_souls",
+      "kind": "damage",
       "scaleType": "linear",
-      "base": 3,
+      "base": 7,
       "growth": 1
     },
-    "desc": "Dorf-Karte: Nur auf Dörfer spielbar. Jede Ankunft des Helden bringt dir Seelen."
+    "desc": "Schaden beim Betreten",
+    "lore": "Ein brennender Riss zur Hölle."
   },
-
   {
-    "id": "giftige_katakomben",
-    "name": "Giftige Katakomben",
-    "type": "dungeon",
-    "elements": ["natur", "schatten"],
+    "id": "trap_schattenklinge",
+    "name": "Schattenklinge",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 1.5
+    },
+    "desc": "Hoher Direktschaden",
+    "lore": "Unsichtbar bis zum Schlag."
+  },
+  {
+    "id": "trap_knochenfalle",
+    "name": "Knochenfalle",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
     "cost": 1,
     "effect": {
       "kind": "dot",
       "scaleType": "linear",
       "base": 2,
-      "growth": 0.3
+      "growth": 0.5,
+      "days": 2
     },
-    "desc": "Dungeon-Karte: Nur auf Dungeons spielbar. Die Luft hier frißt sich Tag für Tag in die Lungen des Helden."
+    "desc": "Schaden + DoT",
+    "lore": "Aus Knochen alter Helden gebaut."
   },
   {
-    "id": "sturzfalle",
-    "name": "Sturzfalle",
-    "type": "dungeon",
-    "elements": ["eis", "licht"],
+    "id": "trap_daemonisches_siegel",
+    "name": "Dämonisches Siegel",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "trap_buff",
+      "scaleType": "linear",
+      "base": 15,
+      "growth": 5,
+      "days": 999
+    },
+    "desc": "Verstärkt nächste Falle",
+    "lore": "Ein Mal der Vorwarnung."
+  },
+  {
+    "id": "trap_brandmal",
+    "name": "Brandmal",
+    "type": "falle",
+    "elements": [
+      "feuer"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.5,
+      "days": 2
+    },
+    "desc": "DoT",
+    "lore": "Die Haut brennt Tage später noch."
+  },
+  {
+    "id": "trap_seelenhaken",
+    "name": "Seelenhaken",
+    "type": "falle",
+    "elements": [
+      "blut",
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "damage_plus_souls",
+      "scaleType": "linear",
+      "base": 6,
+      "growth": 1,
+      "soulsBase": 2,
+      "soulsGrowth": 1
+    },
+    "desc": "Schaden + Seelen",
+    "lore": "Reißt Körper und Geist."
+  },
+  {
+    "id": "trap_verfluchte_runen",
+    "name": "Verfluchte Runen",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.5,
+      "days": 2
+    },
+    "desc": "Schaden pro Tag",
+    "lore": "Flüstern bei jedem Schritt."
+  },
+  {
+    "id": "trap_hoellenstachel",
+    "name": "Höllenstachel",
+    "type": "falle",
+    "elements": [
+      "feuer"
+    ],
     "cost": 1,
     "effect": {
       "kind": "damage",
       "scaleType": "linear",
-      "base": 4,
-      "growth": 0.5
+      "base": 10,
+      "growth": 1.5
     },
-    "desc": "Dungeon-Karte: Nur auf Dungeons spielbar. Ein plötzlicher Sturz fügt dem Helden massiven Schaden zu."
+    "desc": "Einzelhit",
+    "lore": "Ein Stich aus reinem Hass."
+  },
+  {
+    "id": "trap_aderlasspfad",
+    "name": "Aderlasspfad",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.5,
+      "days": 2
+    },
+    "desc": "DoT bei Bewegung",
+    "lore": "Jeder Schritt kostet Blut."
+  },
+  {
+    "id": "trap_schattenschnitt",
+    "name": "Schattenschnitt",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 7,
+      "growth": 1
+    },
+    "desc": "Ignoriert Reduktionen",
+    "lore": "Die Rüstung hilft nicht."
+  },
+  {
+    "id": "trap_infernalnetz",
+    "name": "Infernalnetz",
+    "type": "falle",
+    "elements": [
+      "feuer",
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "multi_hit",
+      "scaleType": "linear",
+      "base": 4,
+      "growth": 1,
+      "hits": 2
+    },
+    "desc": "Mehrfachtrigger",
+    "lore": "Gefangen im Flammengewebe."
+  },
+  {
+    "id": "trap_knochenkreis",
+    "name": "Knochenkreis",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "aoe_damage",
+      "scaleType": "linear",
+      "base": 6,
+      "growth": 1
+    },
+    "desc": "AoE-Schaden",
+    "lore": "Ein Ritualkreis des Todes."
+  },
+  {
+    "id": "trap_daemonenmarke",
+    "name": "Dämonenmarke",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "trap_buff",
+      "scaleType": "linear",
+      "base": 15,
+      "growth": 5,
+      "days": 999
+    },
+    "desc": "Fallenbonus",
+    "lore": "Ein Zeichen des Untergangs."
+  },
+  {
+    "id": "trap_feuersiegel",
+    "name": "Feuersiegel",
+    "type": "falle",
+    "elements": [
+      "feuer"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "delayed_blast",
+      "scaleType": "linear",
+      "base": 8,
+      "growth": 1,
+      "delayDays": 1
+    },
+    "desc": "Explosion nach 1 Tag",
+    "lore": "Ein schwelendes Versprechen."
+  },
+  {
+    "id": "trap_blutritual",
+    "name": "Blutritual",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "damage",
+      "scaleType": "linear",
+      "base": 7,
+      "growth": 1
+    },
+    "desc": "Schaden + Schwächung",
+    "lore": "Opfer müssen gebracht werden."
+  },
+  {
+    "id": "trap_schattenfeld",
+    "name": "Schattenfeld",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.5,
+      "days": 2
+    },
+    "desc": "Schaden pro Tag",
+    "lore": "Dunkelheit verschlingt alles."
+  },
+  {
+    "id": "trap_aschepfad",
+    "name": "Aschepfad",
+    "type": "falle",
+    "elements": [
+      "feuer"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "dot",
+      "scaleType": "linear",
+      "base": 2,
+      "growth": 0.5,
+      "days": 2
+    },
+    "desc": "DoT",
+    "lore": "Wo Asche liegt, wächst kein Mut."
+  },
+  {
+    "id": "trap_opferstaette",
+    "name": "Opferstätte",
+    "type": "falle",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "kill_bonus_souls",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 0
+    },
+    "desc": "Tod → +Seelen",
+    "lore": "Hier endet jeder Weg."
+  },
+  {
+    "id": "trap_seelenmal",
+    "name": "Seelenmal",
+    "type": "falle",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "kill_bonus_souls",
+      "scaleType": "linear",
+      "base": 10,
+      "growth": 0
+    },
+    "desc": "Tod-Bonus",
+    "lore": "Der Ort merkt sich jedes Opfer."
+  },
+  {
+    "id": "dorf_spion_eingeschleust",
+    "name": "Spion eingeschleust",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "reveal",
+            "count": 1
+          }
+        ],
+        "text": "Reveal"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "false_info",
+            "count": 1
+          }
+        ],
+        "text": "Held merkt es und gibt dir eine Falsche Info"
+      }
+    },
+    "desc": "Chance: Reveal / Held merkt es und gibt dir eine Falsche Info",
+    "lore": ""
+  },
+  {
+    "id": "dorf_daemonenhorde",
+    "name": "Dämonenhorde",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "ruin_village"
+          },
+          {
+            "kind": "damage_pct",
+            "pct": 10
+          }
+        ],
+        "text": "Dorf zerstört (Held bekommt 10% Schaden)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "item_shield",
+            "stacks": 1
+          }
+        ],
+        "text": "Held rettet Dorf (bekommt ein Item)"
+      }
+    },
+    "desc": "Chance: Dorf zerstört (Held bekommt 10% Schaden) / Held rettet Dorf (bekommt ein Item)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_verzweiflung_saeen",
+    "name": "Verzweiflung säen",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "damage_pct",
+            "pct": 10
+          }
+        ],
+        "text": "Held verliert HP  (Held bekommt 10% Schaden)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "hero_resist_days",
+            "pct": 10,
+            "days": 3
+          }
+        ],
+        "text": "Held wird vorsichtiger nächste (dungen/Dorf karte geht automatisch schief)"
+      }
+    },
+    "desc": "Chance: Held verliert HP  (Held bekommt 10% Schaden) / Held wird vorsichtiger nächste (dungen/Dorf karte geht automatisch schief)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_falsche_propheten",
+    "name": "Falsche Propheten",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "hero_vuln_days",
+            "pct": 10,
+            "days": 3
+          }
+        ],
+        "text": "Held bekommt Efeckt \"Angst\" (10% mehr schaden)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "hero_resist_days",
+            "pct": 10,
+            "days": 3
+          }
+        ],
+        "text": "Held mekt deine Schwäche bekommt Efeckt \"Siegessicher\" (8% weniger schaden)"
+      }
+    },
+    "desc": "Chance: Held bekommt Efeckt \"Angst\" (10% mehr schaden) / Held mekt deine Schwäche bekommt Efeckt \"Siegessicher\" (8% weniger schaden)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_seelenraub",
+    "name": "Seelenraub",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "gain_souls",
+            "amount": 10
+          }
+        ],
+        "text": "Seelen (du bekommt 10 Seelen)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "shop_penalty",
+            "amount": 9
+          }
+        ],
+        "text": "Jop (nähster einkauf wird 9 Seelen teuerer)"
+      }
+    },
+    "desc": "Chance: Seelen (du bekommt 10 Seelen) / Jop (nähster einkauf wird 9 Seelen teuerer)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_sabotage",
+    "name": "Sabotage",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "ruin_village"
+          },
+          {
+            "kind": "damage_pct",
+            "pct": 8
+          }
+        ],
+        "text": "Brunnen vergiftet (Dorf Zerstört Held bekommt Efeckt \"Gift\")"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "hero_resist_days",
+            "pct": 10,
+            "days": 3
+          }
+        ],
+        "text": "Held verhindert die Aktion Bekommt Efeckt \"Siegessicher\""
+      }
+    },
+    "desc": "Chance: Brunnen vergiftet (Dorf Zerstört Held bekommt Efeckt \"Gift\") / Held verhindert die Aktion Bekommt Efeckt \"Siegessicher\"",
+    "lore": ""
+  },
+  {
+    "id": "dorf_verfuerung",
+    "name": "Verfürung",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "freeze_days",
+            "days": 1
+          }
+        ],
+        "text": "Held bleibt ein Tag länger im Dorf"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "immune_to_strong"
+          }
+        ],
+        "text": "Held bekommt Efeckt \"de Mann\" (Ist emun gegen 3 zufällige elemente)"
+      }
+    },
+    "desc": "Chance: Held bleibt ein Tag länger im Dorf / Held bekommt Efeckt \"de Mann\" (Ist emun gegen 3 zufällige elemente)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_saufgelage",
+    "name": "Saufgelage",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "drunk_next_trap",
+            "mult": 2
+          }
+        ],
+        "text": "Held bekommt Efeckt \"Bedrunken\" (nähste falle Lösst doppelt aus) näster Jop einkauf kosstet dich 5 Seelen mehr"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "shop_penalty",
+            "amount": 5
+          }
+        ],
+        "text": "jop (nähster einkauf wird 5 Seelen teuerer)"
+      }
+    },
+    "desc": "Chance: Held bekommt Efeckt \"Bedrunken\" (nähste falle Lösst doppelt aus) näster Jop einkauf kosstet dich 5 Seelen mehr / jop (nähster einkauf wird 5 Seelen teuerer)",
+    "lore": ""
+  },
+  {
+    "id": "dorf_schattenhandel",
+    "name": "Schattenhandel",
+    "type": "dorf",
+    "elements": [
+      "schatten"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "reveal",
+            "count": 1
+          },
+          {
+            "kind": "shop_penalty",
+            "amount": 3
+          }
+        ],
+        "text": "Reveal (nähster einkauf wird 3 Seelen teuerer)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "shop_penalty",
+            "amount": 9
+          }
+        ],
+        "text": "Jop (nähster einkauf wird 9 Seelen teuerer)"
+      }
+    },
+    "desc": "Chance: Reveal (nähster einkauf wird 3 Seelen teuerer) / Jop (nähster einkauf wird 9 Seelen teuerer)",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_erdbeben",
+    "name": "Erdbeben",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "damage_pct",
+            "pct": 10
+          }
+        ],
+        "text": "Held bekommt schaden (10% Schaden)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "item_shield",
+            "stacks": 1
+          }
+        ],
+        "text": "Held Bonus Item"
+      }
+    },
+    "desc": "Chance: Held bekommt schaden (10% Schaden) / Held Bonus Item",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_da_war_wohl_wer_zuerst_da",
+    "name": "Da war wohl wer zuerst da",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "block_items",
+            "days": 3
+          }
+        ],
+        "text": "Held bekommt kein Item"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "item_shield",
+            "stacks": 2
+          }
+        ],
+        "text": "Held findet ein verstäcket kammer mit ein 2 Item"
+      }
+    },
+    "desc": "Chance: Held bekommt kein Item / Held findet ein verstäcket kammer mit ein 2 Item",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_daemonenfalle",
+    "name": "Dämonenfalle",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "dot_burst"
+          }
+        ],
+        "text": "DoT sofort"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "dot_clear"
+          }
+        ],
+        "text": "DoT entfernt"
+      }
+    },
+    "desc": "Chance: DoT sofort / DoT entfernt",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_opferkammer",
+    "name": "Opferkammer",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "next_sacrifice_bonus",
+            "levels": 1
+          }
+        ],
+        "text": "nähste runde werden alle karten auf deiner Hand gelevelt"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "nothing"
+          }
+        ],
+        "text": "Keine Karte Wird gelevelt"
+      }
+    },
+    "desc": "Chance: nähste runde werden alle karten auf deiner Hand gelevelt / Keine Karte Wird gelevelt",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_blutritualstaette",
+    "name": "Blutritualstätte",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "maxhp_pct",
+            "pct": -10
+          }
+        ],
+        "text": "Held bekommt Efeckt \"Verstört\" (MaxHP 10% Reduzirt)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "maxhp_pct",
+            "pct": 8
+          }
+        ],
+        "text": "Held bekommt Efeckt \"Rache\" (MaxHP 8% Erhöt)"
+      }
+    },
+    "desc": "Chance: Held bekommt Efeckt \"Verstört\" (MaxHP 10% Reduzirt) / Held bekommt Efeckt \"Rache\" (MaxHP 8% Erhöt)",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_ueberflutung",
+    "name": "Überflutung",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "ruin_dungeon"
+          }
+        ],
+        "text": "Dungen ist zestört"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "item_shield",
+            "stacks": 1
+          }
+        ],
+        "text": "Held kann Tauchen"
+      }
+    },
+    "desc": "Chance: Dungen ist zestört / Held kann Tauchen",
+    "lore": ""
+  },
+  {
+    "id": "dungeon_extra_monster",
+    "name": "Extra Monster",
+    "type": "dungeon",
+    "elements": [
+      "blut"
+    ],
+    "cost": 1,
+    "effect": {
+      "kind": "chance_event",
+      "scaleType": "linear",
+      "base": 0.5,
+      "growth": 0.1,
+      "min": 0.05,
+      "max": 0.95,
+      "playerWin": {
+        "actions": [
+          {
+            "kind": "damage_pct",
+            "pct": 15
+          }
+        ],
+        "text": "Held bekommt schaden (15% Schaden)"
+      },
+      "heroWin": {
+        "actions": [
+          {
+            "kind": "hero_resist_days",
+            "pct": 10,
+            "days": 3
+          }
+        ],
+        "text": "Held verhindert die Aktion Bekommt Efeckt \"Siegessicher\""
+      }
+    },
+    "desc": "Chance: Held bekommt schaden (15% Schaden) / Held verhindert die Aktion Bekommt Efeckt \"Siegessicher\"",
+    "lore": ""
   }
 ]

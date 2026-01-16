@@ -6,7 +6,7 @@
 // ============================================================================
 
 // ---- Basiswerte / Limits ----------------------------------------------------
-export const BASE_ENERGY = 3;   // Start-Energie pro Tag (ohne Runen)
+export const BASE_ENERGY = 3;   // Start-Energie pro Tag
 export const HAND_LIMIT  = 7;   // max. Karten in der Hand (Draw stoppt vorher)
 export const BASE_DRAW   = 4;   // Karten, die zu Tagesbeginn gezogen werden
 export let   RUN_DAYS    = 10;  // Ziel-Tage (kann durch Karten verlängert werden)
@@ -18,7 +18,7 @@ export const GameState = {
   day: 1,               // aktueller Tag (1..maxDays)
   maxDays: RUN_DAYS,    // dynamisch erweiterbar (z. B. durch Karten)
   energy: 0,            // verfügbare Energie im aktuellen Tag
-  souls: 0,             // Währung für Runen/Meta
+  souls: 0,             // Währung für Meta
   round: 1,             // wie viele Helden besiegt (Start = 1)
   campDays: 3,          // verbleibende „am Start bleiben“-Tage
 
@@ -30,26 +30,8 @@ export const GameState = {
   hand: [],
   discard: [],
 
-  // --- Held / Runen / temporäre Modifikatoren ---
-  hero: null,                               // wird bei Run-Start via createHero() gesetzt
-    runes: {                                  // Meta-Boni, die beginDay/endDay beeinflussen
-    draw:   false,                          // +1 Karte ziehen pro Tag (Beispiel)
-    energy: false,                          // +1 Energie pro Tag (Beispiel)
-    soul:   false,                          // +1 Seele je Kill (Beispiel)
-
-    // Element-Runen: true = +20 % Schaden für dieses Element
-    elements: {
-      feuer:    false,
-      blut:     false,
-      schatten: false,
-      eis:      false,
-      natur:    false,
-      licht:    false,
-    },
-
-    // maximale Anzahl gleichzeitig ausgerüsteter Element-Runen
-    maxElementSlots: 3,
-  },
+  // --- Held / temporäre Modifikatoren ---
+  hero: null, 
 
   mods: {                                   // temporäre Multiplikatoren/Buffs
     cursePct:     0,                        // z. B. +% Fluchschaden
@@ -91,7 +73,6 @@ Hinweise:
 - Das eigentliche Karten-Template-Management (Library) liegt in cards.js
   (setCardLibrary, newInstance, instView, playCard, drawCards, …).
 - beginDay()/endDay() (in turns.js) nutzen BASE_ENERGY/BASE_DRAW sowie
-  GameState.runes, um Energie/Karten pro Tag zu bestimmen.
 - Das rotierende Deck bedeutet: Gespielte/platzierte Karten-Instanzen
   gehen zurück ins Deck (nur "Opfern" entfernt eine Instanz dauerhaft).
 */

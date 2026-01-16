@@ -1,0 +1,13 @@
+[
+  {
+    "id": "verstoert",
+    "name": "Verstört",
+    "stackable": true,
+    "maxStacks": 99,
+    "durationDays": null,
+    "onApply": [
+      { "kind": "reduce_maxhp_pct", "pct": 10 }
+    ],
+    "desc": "Senkt MaxHP um 10% (stapelbar)."
+  }
+]

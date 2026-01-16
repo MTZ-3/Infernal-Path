@@ -9,9 +9,9 @@
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW, clamp, RUN_DAYS  } from "./gameState.js";
-import { drawCards }   from "../cards/cards.js";
-import { triggerNode } from "../cards/cards.js";
+import { drawCards,triggerNode,computePassiveBonuses,elementalFactorFor }   from "../cards/cards.js";
 import { regenerateMap, renderMap } from "../map/map.js";
+import { tickEffectsOneDay, tickHeroStatusOneDay } from "../effects/effects.js";
 
 // kleines lokales Shuffle – reicht fürs Tagesmischen
 const shuffle = (a) => {
@@ -27,19 +27,19 @@ const shuffle = (a) => {
 // beginDay: Energie setzen + Portal (entscheidet, wann gezogen wird)
 // ============================================================================
 export function beginDay() {
-  const extraEnergy = GameState.runes?.energy ? 1 : 0;
-  GameState.energy = BASE_ENERGY + extraEnergy;
+  const pass = computePassiveBonuses();
 
-  const extraDraw  = GameState.runes?.draw ? 1 : 0;
-  const drawCount  = BASE_DRAW + extraDraw;
+  GameState.energy = BASE_ENERGY + (pass.energyBonus || 0);
 
-  // Portal-first-Logik:
-  // Portal entscheidet, welche Karte dazu kommt UND zieht danach die Tageshand.
-  // Wenn __portalDaily nicht gesetzt ist → einfach normal ziehen.
+  const drawCount = BASE_DRAW + (pass.drawBonus || 0);
+
+  // optional: Gratis-Rerolls für Shop pro Tag
+  GameState.mods = GameState.mods || {};
+  GameState.mods.freeRerollsLeft = pass.freeRerollBonus || 0;
+
   if (typeof window.__portalDaily === "function") {
     window.__portalDaily(drawCount);
   } else {
-    // Fallback: klassisch nur ziehen
     drawCards(drawCount);
     window.__log?.(
       `<span class="small muted">beginDay → Tag ${GameState.day} • Energie=${GameState.energy} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}</span>`
@@ -48,6 +48,7 @@ export function beginDay() {
     renderMap?.();
   }
 }
+
 
 // ============================================================================
 // endDay: zentraler Tagesabschluss
@@ -75,6 +76,8 @@ export function endDay() {
     // --- 1) DoTs ticken lassen (mit Elementen) ---
   let totalFinal = 0;
   const parts = [];
+  tickEffectsOneDay();       // deine Effekt-Library (verstoert etc.)
+  tickHeroStatusOneDay();    // frozen/vuln/resist/blockItems/...
 
   h.dots.forEach(d => {
     const base = d.dmg;
@@ -108,10 +111,29 @@ export function endDay() {
     );
   }
 
+  // delayed blasts ticken und auslösen
+  h.status.delayed = Array.isArray(h.status.delayed) ? h.status.delayed : [];
+  const keepDelayed = [];
+  for (const d of h.status.delayed) {
+    d.daysLeft = Math.max(0, (d.daysLeft ?? 0) - 1);
+    if (d.daysLeft > 0) { keepDelayed.push(d); continue; }
+
+    const base = Math.max(0, Math.round(d.dmg ?? 0));
+    const elem = d.element ?? null;
+    const factor = elementalFactorFor(h, elem);
+    const final = Math.max(0, Math.round(base * factor));
+
+    if (final > 0) {
+      h.hp = clamp(h.hp - final, 0, h.maxHp);
+      window.__log?.(`<span class="small">💥 Explosion: ${final}${elem ? ` (${elem})` : ""}</span>`);
+    }
+  }
+  h.status.delayed = keepDelayed;
+
 
   // --- 2) Dauer-Effekte abbauen ---
   if ((h.status.frozenDays ?? 0) > 0) h.status.frozenDays--;
-  if ((h.status.slowDays   ?? 0) > 0) h.status.slowDays--;
+  tickEffectsOneDay();
 
   // --- 3) Bewegung / Camp-Logik ---
   const frozenNow = (h.status.frozenDays ?? 0) > 0;
@@ -162,14 +184,12 @@ export function endDay() {
     const earlyRaw  = Math.max(0, maxDays - dayNow);
     const earlyBonus = Math.floor(earlyRaw / 2); // alle 2 "ersparten" Tage = +1 Seele
 
-    // Rune-Bonus (+1, wenn r_soul aktiv)
-    const runeBonus = GameState.runes?.soul ? 1 : 0;
 
-    const gain = baseSouls + earlyBonus + runeBonus;
+    const gain = baseSouls + earlyBonus;
     GameState.souls += gain;
 
     window.__toast?.(
-      `<b>SIEG</b> – Held fällt (+${gain} Seelen: ${baseSouls} Basis, ${earlyBonus} früh, ${runeBonus} Rune)`
+      `<b>SIEG</b> – Held fällt (+${gain} Seelen: ${baseSouls} Basis, ${earlyBonus} früh)`
     );
 
     // Runden-/Levelzähler hoch
@@ -258,12 +278,22 @@ function applyTileOnEnter(n) {
     h.hp = h.maxHp;
     n.kind = "visited_village";
     window.__log?.(`<span class="small">Das Dorf heilt den Helden vollständig.</span>`);
-  } else if (n.kind === "dungeon") {
+  }
+    else if (n.kind === "ruined_village") {
+    window.__log?.(`<span class="small muted">Das Dorf ist zerstört. Keine Heilung.</span>`);
+    n.kind = "visited_village";
+  }
+  else if (n.kind === "dungeon") {
     if (Math.random() < 0.5) {
       const dmg = 5 + Math.floor(Math.random() * 6); // 5..10
       h.hp = clamp(h.hp - dmg, 0, h.maxHp);
       window.__log?.(`<span class="small">Dungeon-Falle! ${dmg} Schaden.</span>`);
-    } else {
+    }
+    else if (n.kind === "ruined_dungeon") {
+    window.__log?.(`<span class="small muted">Der Dungeon ist zerstört. Keine Beute.</span>`);
+    n.kind = "cleared_dungeon";
+    }
+    else {
       GameState.souls += 5;
       window.__log?.(`<span class="small">Dungeon-Beute! +5 Seelen.</span>`);
     }

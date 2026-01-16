@@ -22,13 +22,14 @@ export function createHero(blueprint) {
 
   const h = {
     name: blueprint.name,
+    level: (GameState.round ?? 1),
     maxHp: blueprint.maxHp,
     hp:  blueprint.maxHp,
     dist: GameState.maxDays,
     dots: [],
     speed: blueprint.baseSpeed || 1,
     alive: true,
-    status: { frozenDays: 0, slowDays: 0, weakenPct: 0 },
+    status: { frozenDays: 0, weakenPct: 0 },
 
     // NEU: elementare Stärken/Schwächen
     strongElement: strong,  // bekommt nur 50% Schaden von diesem Element

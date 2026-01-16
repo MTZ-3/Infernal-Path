@@ -7,24 +7,20 @@
 // - Lobby (Deck-Auswahl)
 // - Portal
 // - Opferaltar & Deck-Übersicht
-// - Runen-Panel + Runen-Shop
+// - Shop
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW} from "../game/core/gameState.js";
-import { playCard, instView, newInstance, drawCards, sacrifice, bindLogger as bindCardLogger, scaledValue} from "../game/cards/cards.js";
+import { playCard, instView, newInstance, drawCards, sacrifice, bindLogger as bindCardLogger, scaledValue, computePassiveBonuses} from "../game/cards/cards.js";
 import { renderMap } from "../game/map/map.js";
+import { endDay } from "../game/core/turns.js";
+
 
 // ============================================================================
 // Kleine Helper
 // ============================================================================
 
-// Laufzeit-Runendaten aus runes.de.json
-let RUNE_DEFS = [];
 
-/** Wird von main.js nach dem JSON-Load aufgerufen. */
-export function setRuneDefs(list) {
-  RUNE_DEFS = Array.isArray(list) ? list : [];
-}
 
 
 function elementsHtml(arr) {
@@ -35,7 +31,7 @@ function elementsHtml(arr) {
 }
 
 /**
- * Effekt-Vorschau für eine Instanz – OHNE Runen/Element-Vulnerability,
+ * Effekt-Vorschau für eine Instanz – OHNE Element-Vulnerability,
  * damit die Karte einen stabilen „Basiswert“ zeigt.
  */
 function effectPreviewFromInst(inst) {
@@ -55,9 +51,7 @@ function effectPreviewFromInst(inst) {
   if (kind === "freeze_days") {
     return `Einfrieren: ${val}T`;
   }
-  if (kind === "slow_move_days") {
-    return `Verlangsamung: ${val}T`;
-  }
+  
   if (kind === "weaken") {
     return `Schwächung: ${val}%`;
   }
@@ -80,9 +74,6 @@ function effectPreviewFromTemplate(t, level = 1) {
   return effectPreviewFromInst(fakeInst);
 }
 
-
-const MAX_ELEMENT_RUNES = 3;
-
 let logBox;
 
 // ============================================================================
@@ -96,12 +87,15 @@ export function mountUI(app) {
       <button id="btn-new-run">Neuer Run</button>
       <button id="btn-end-day">Tag beenden</button>
       <button id="btn-demon">👁 Dämon</button>
+      <button id="btn-cheat">⚙️ Cheat</button>
     </div>
+
+
+    
 
     <div id="main-layout">
       <div id="left-side">
         <div id="map"></div>
-        <div id="runes"></div>
         <div id="hand" class="hand"></div>
         <div id="altar" class="altar">Opferaltar</div>
       </div>
@@ -114,6 +108,10 @@ export function mountUI(app) {
     <div id="overlay"><div id="overlay-inner"></div></div>
   `;
   logBox = document.querySelector("#log");
+
+  const btnCheat = document.querySelector("#btn-cheat");
+    if (btnCheat) {
+      btnCheat.onclick = () => openCheatPanel();}
 
   const altar = document.querySelector("#altar");
   if (altar) altar.addEventListener("click", onAltarClick);
@@ -158,47 +156,6 @@ function log(msg) {
     logBox.appendChild(div);
   }
   logBox.scrollTop = 0;
-}
-
-// ============================================================================
-// Runen-Panel (unter der Map)
-// ============================================================================
-
-function renderRunesPanel() {
-  const box = document.querySelector("#runes");
-  if (!box) return;
-
-  const runes = GameState.runes || {};
-  const elems = runes.elements || {};
-  const active = Object.entries(elems).filter(([, v]) => v);
-
-  if (!active.length) {
-    box.innerHTML = `<div class="panel small muted">Keine Element-Runen aktiv.</div>`;
-    return;
-  }
-
-  const iconMap = {
-    feuer: "🔥",
-    blut: "🩸",
-    schatten: "🌑",
-    eis: "❄️",
-    natur: "🌿",
-    licht: "✨",
-  };
-
-  box.innerHTML = `
-    <div class="panel small">
-      <div class="row"><b>Aktive Runen</b></div>
-      <div class="row" style="flex-wrap:wrap;gap:6px">
-        ${active
-          .map(
-            ([el]) =>
-              `<span class="pill">${iconMap[el] || ""} ${el} +20%</span>`
-          )
-          .join("")}
-      </div>
-    </div>
-  `;
 }
 
 // ============================================================================
@@ -308,8 +265,6 @@ export function render() {
   const deckEl = document.querySelector("#stat-deck");
   if (deckEl) deckEl.onclick = () => openDeckBrowser();
 
-  // Runen-Panel
-  renderRunesPanel();
 
   // Hand
   const hand = document.querySelector("#hand");
@@ -451,7 +406,6 @@ export function showLobby(allCards) {
 
   const TYPES = [
     "alle",
-    "fluch",
     "kontrolle",
     "daemon",
     "ritual",
@@ -576,149 +530,340 @@ export function showLobby(allCards) {
 }
 
 // ============================================================================
-// Runen-Shop
+// Shop
 // ============================================================================
 
-export function showRuneShop() {
+
+
+export function showShop(allCards) {
   const ov    = document.querySelector("#overlay");
   const inner = document.querySelector("#overlay-inner");
   if (!ov || !inner) return;
 
   openOverlay();
 
-  const runeState = GameState.runes || {};
-  const elemRunes = runeState.elements || {};
-  const souls     = GameState.souls ?? 0;
+  const pass = computePassiveBonuses();
+  const extraSlots = pass.shopSlotsBonus || 0;
+  const slots = 3 + extraSlots;
 
-  const elementRunes = RUNE_DEFS.filter(r => r.type === "element");
-  const metaRunes    = RUNE_DEFS.filter(r => r.type === "meta");
+  // Pool: nur Passiv-Karten
+  const passives = (allCards || []).filter(c => c.type === "passiv");
+
+  // Hilfsfunktion: Picks neu würfeln
+  const rollOffers = () => shuffleArray(passives).slice(0, Math.min(slots, passives.length));
+
+  // Rerolls pro Tag (gratis durch passive_free_reroll)
+  GameState.mods = GameState.mods || {};
+  if (GameState.mods.freeRerollsLeft == null) GameState.mods.freeRerollsLeft = 0;
+
+  let offers = rollOffers();
+
+  const renderShop = () => {
+    const souls = GameState.souls ?? 0;
+    const penalty = GameState.mods?.shopPenalty || 0;
+
+    inner.innerHTML = `
+      <div class="lobby-wrap">
+        <div class="lobby-head">
+          <h2>Shop</h2>
+          <div class="lobby-tools">
+            <span class="lobby-counter">Seelen: ${souls}</span>
+            <button id="btn-reroll">Reroll</button>
+            <button id="btn-close-shop" class="warn">Schließen</button>
+          </div>
+        </div>
+        <div class="small muted" style="margin-bottom:8px">
+          Slots: ${slots} • Gratis-Rerolls: ${GameState.mods.freeRerollsLeft || 0}${penalty ? ` • Nächster Einkauf +${penalty}` : ""}
+        </div>
+        <div class="lobby-grid" id="shop-grid"></div>
+      </div>
+    `;
+
+    const grid = inner.querySelector("#shop-grid");
+
+    offers.forEach((tpl) => {
+      const level = GameState.round ?? 1;
+      const shopCost = Math.max(0, Math.round(tpl.shopCost ?? 6));
+      const finalCost = shopCost + (GameState.mods?.shopPenalty || 0);
+
+      const preview = (() => {
+        const fakeInst = { tplId: tpl.id, level };
+        // du hast schon effectPreviewFromInst, wenn du willst nutz das.
+        const val = Math.max(1, Math.floor(scaledValue(fakeInst)));
+        const kind = tpl.effect?.kind;
+
+        if (kind === "passive_elem_pct") return `+${tpl.effect?.base ?? val}% ${tpl.effect?.element}-Schaden`;
+        if (kind === "passive_per_element_pct") return `+${tpl.effect?.base ?? val}% pro Element`;
+        if (kind === "passive_dot_pct") return `+${tpl.effect?.base ?? val}% DoT`;
+        if (kind === "passive_dot_days") return `DoT +${tpl.effect?.base ?? val} Tag(e)`;
+        if (kind === "passive_lowhp_taken_pct") return `+${tpl.effect?.base ?? val}% unter ${(tpl.effect?.threshold ?? 0.3)*100}% HP`;
+        if (kind === "passive_draw") return `+${tpl.effect?.base ?? val} Handkarte`;
+        if (kind === "passive_energy") return `+${tpl.effect?.base ?? val} Energie`;
+        if (kind === "passive_souls_pct") return `+${tpl.effect?.base ?? val}% Seelen`;
+        if (kind === "passive_sacrifice_level") return `Opferung +${tpl.effect?.base ?? val} Level`;
+        if (kind === "passive_shop_slots") return `Shop +${tpl.effect?.base ?? val} Slot`;
+        if (kind === "passive_free_reroll") return `+${tpl.effect?.base ?? val} Gratis-Reroll`;
+        if (kind === "passive_reveal") return `Deckt ${tpl.effect?.base ?? val} Trait auf`;
+        return "";
+      })();
+
+      const affordable = (GameState.souls ?? 0) >= finalCost;
+
+      const div = document.createElement("div");
+      div.className = "card shop-card";
+      div.innerHTML = `
+        <div class="badge">passiv</div>
+        <div class="name">${tpl.name}</div>
+        <div class="desc small">${tpl.desc || ""}</div>
+        ${preview ? `<div class="mini small muted">${preview}</div>` : ""}
+        <div class="desc small">Kosten: ${shopCost}${(GameState.mods?.shopPenalty || 0) ? ` (+${GameState.mods.shopPenalty})` : ""} = <b>${finalCost}</b></div>
+        <button class="primary" ${affordable ? "" : "disabled"}>Kaufen</button>
+      `;
+
+      div.querySelector("button").onclick = () => {
+        if (!affordable) return;
+
+        GameState.souls -= finalCost;
+        if (GameState.mods?.shopPenalty) GameState.mods.shopPenalty = 0; // “nächster Einkauf”
+
+        const inst = newInstance(tpl.id, level);
+        GameState.deck.push(inst);
+        // optional mischen:
+        // shuffleInPlace(GameState.deck);
+
+        window.__log?.(`<span class="k">Gekauft</span>: <b>${tpl.name}</b> (L${level}) ins Deck.`);
+        window.__render?.();
+        renderShop(); // refresh
+      };
+
+      grid.appendChild(div);
+    });
+
+    inner.querySelector("#btn-close-shop").onclick = () => closeOverlay();
+
+    inner.querySelector("#btn-reroll").onclick = () => {
+      // 1) gratis rerolls zuerst verbrauchen
+      if ((GameState.mods.freeRerollsLeft || 0) > 0) {
+        GameState.mods.freeRerollsLeft--;
+        offers = rollOffers();
+        renderShop();
+        return;
+      }
+
+      // 2) sonst kostet reroll z.B. 2 seelen (kannst du später ändern)
+      const rerollCost = 2;
+      if ((GameState.souls ?? 0) < rerollCost) {
+        window.__log?.("Nicht genug Seelen für Reroll.");
+        return;
+      }
+      GameState.souls -= rerollCost;
+      offers = rollOffers();
+      renderShop();
+    };
+  };
+
+  renderShop();
+}
+
+
+// ============================================================================
+// Cheat
+// ============================================================================
+
+function openCheatPanel() {
+  const ov = document.querySelector("#overlay");
+  const inner = document.querySelector("#overlay-inner");
+  if (!ov || !inner) {
+    window.__log?.("Overlay fehlt – Cheatpanel kann nicht geöffnet werden.");
+    return;
+  }
+
+  openOverlay();
 
   inner.innerHTML = `
     <div class="lobby-wrap">
       <div class="lobby-head">
-        <h2>Runen-Shop</h2>
-        <div class="lobby-tools">
-          <span class="lobby-counter">Seelen: ${souls}</span>
-          <button id="btn-close-shop" class="warn">Schließen</button>
+        <h2>Dev-Cheats</h2>
+        <button id="cheat-close" class="warn">Schließen</button>
+      </div>
+
+      <div class="small muted" style="margin-bottom:10px">
+        Nur zum Testen. Du kannst Runs absichtlich kaputt machen – dafür ist es da.
+      </div>
+
+      <div class="lobby-grid" style="grid-template-columns:1fr;">
+        <div class="panel">
+          <h3>Held</h3>
+          <button id="cheat-kill-hero" class="warn">Held sofort töten (endDay)</button>
+          <button id="cheat-freeze-hero">Held einfrieren (+1 Tag)</button>
+          <button id="cheat-heal-hero">Held voll heilen</button>
+        </div>
+
+        <div class="panel">
+          <h3>Run / Werte</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <label class="small muted">Seelen</label>
+            <input id="cheat-souls" type="number" min="0" value="10"
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:90px" />
+            <button id="cheat-add-souls">+ geben</button>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <label class="small muted">Energie</label>
+            <input id="cheat-energy" type="number" min="0" value="3"
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:90px" />
+            <button id="cheat-set-energy">setzen</button>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <label class="small muted">Runde</label>
+            <input id="cheat-round" type="number" min="1" value="${GameState.round ?? 1}"
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:90px" />
+            <button id="cheat-set-round">setzen</button>
+          </div>
+
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <label class="small muted">Tag</label>
+            <input id="cheat-day" type="number" min="1" value="${GameState.day ?? 1}"
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:90px" />
+            <button id="cheat-set-day">setzen</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Karte spawnen (in Hand)</h3>
+          <div class="small muted">Template-ID + Level</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px">
+            <input id="cheat-card-id" placeholder='z.B. "blutstacheln"'
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:220px" />
+            <input id="cheat-card-lvl" type="number" min="1" value="1"
+              style="padding:6px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2;width:80px" />
+            <button id="cheat-spawn-card">Spawnen</button>
+          </div>
+        </div>
+
+        <div class="panel">
+          <h3>Debug</h3>
+          <button id="cheat-print-state">State in Console loggen</button>
+          <button id="cheat-clear-hand">Hand leeren</button>
+          <button id="cheat-clear-placed">Placed leeren</button>
         </div>
       </div>
-      <div class="lobby-grid" id="rune-grid"></div>
     </div>
   `;
 
-  const grid = inner.querySelector("#rune-grid");
+  // Close
+  inner.querySelector("#cheat-close").onclick = () => closeOverlay();
 
-  const equippedCount = Object.values(elemRunes).filter(Boolean).length;
-  const maxSlots = runeState.maxElementSlots ?? 3;
+  // Held töten
+  inner.querySelector("#cheat-kill-hero").onclick = () => {
+    if (!GameState.hero) {
+      window.__log?.("Kein Held aktiv.");
+      return;
+    }
+    GameState.hero.hp = 0;
+    window.__log?.("<b>Cheat</b>: Held auf 0 HP gesetzt → endDay()");
+    try { endDay(); } catch (e) { console.error("endDay crash (cheat)", e); }
+    window.__render?.();
+  };
 
-  // ---------- Element-Runen ----------
-  elementRunes.forEach((r) => {
-    const owned = !!elemRunes[r.element];
-    const canEquipMore = equippedCount < maxSlots;
-    const affordable   = souls >= r.cost;
-    const disabled     = owned || !canEquipMore || !affordable;
+  // Freeze +1 Tag
+  inner.querySelector("#cheat-freeze-hero").onclick = () => {
+    if (!GameState.hero) return window.__log?.("Kein Held aktiv.");
+    GameState.hero.status = GameState.hero.status || {};
+    GameState.hero.status.frozenDays = (GameState.hero.status.frozenDays || 0) + 1;
+    window.__log?.("<b>Cheat</b>: Held eingefroren (+1 Tag).");
+    window.__render?.();
+  };
 
-    const div = document.createElement("div");
-    div.className = "card shop-card";
-    div.innerHTML = `
-      <div class="badge">${r.element || ""}</div>
-      <div class="name">${r.name}</div>
-      <div class="mini">+${r.apply?.elementDamagePct ?? 20}% Schaden für ${r.element}-Karten</div>
-      <div class="desc small">Kosten: ${r.cost} Seelen</div>
-      <div class="desc small ${owned ? "k" : "muted"}">
-        ${
-          owned
-            ? "Ausgerüstet"
-            : canEquipMore
-            ? ""
-            : "Max. " + maxSlots + " Element-Runen ausgerüstet"
-        }
-      </div>
-      <button class="primary" ${disabled ? "disabled" : ""}>Kaufen</button>
-    `;
+  // Heal full
+  inner.querySelector("#cheat-heal-hero").onclick = () => {
+    if (!GameState.hero) return window.__log?.("Kein Held aktiv.");
+    GameState.hero.hp = GameState.hero.maxHp;
+    window.__log?.("<b>Cheat</b>: Held voll geheilt.");
+    window.__render?.();
+  };
 
-    const btn = div.querySelector("button");
-    btn.onclick = () => {
-      if (disabled) return;
-      if (GameState.souls < r.cost) {
-        window.__log?.("Nicht genug Seelen.");
-        return;
-      }
+  // Souls geben
+  inner.querySelector("#cheat-add-souls").onclick = () => {
+    const n = Number(inner.querySelector("#cheat-souls").value || "0");
+    if (!Number.isFinite(n) || n < 0) return window.__log?.("Ungültige Seelenzahl.");
+    GameState.souls = (GameState.souls || 0) + Math.floor(n);
+    window.__log?.(`<b>Cheat</b>: +${Math.floor(n)} Seelen.`);
+    window.__render?.();
+  };
 
-      const elemsLocal =
-        GameState.runes.elements ||
-        (GameState.runes.elements = {});
-      const alreadyEquipped = Object.values(elemsLocal).filter(Boolean).length;
+  // Energy setzen
+  inner.querySelector("#cheat-set-energy").onclick = () => {
+    const n = Number(inner.querySelector("#cheat-energy").value || "0");
+    if (!Number.isFinite(n) || n < 0) return window.__log?.("Ungültige Energie.");
+    GameState.energy = Math.floor(n);
+    window.__log?.(`<b>Cheat</b>: Energie = ${GameState.energy}.`);
+    window.__render?.();
+  };
 
-      if (alreadyEquipped >= maxSlots) {
-        window.__log?.(
-          "Du kannst nur " + maxSlots + " Element-Runen gleichzeitig tragen."
-        );
-        return;
-      }
+  // Round setzen
+  inner.querySelector("#cheat-set-round").onclick = () => {
+    const n = Number(inner.querySelector("#cheat-round").value || "1");
+    if (!Number.isFinite(n) || n < 1) return window.__log?.("Ungültige Runde.");
+    GameState.round = Math.floor(n);
+    // Held-Level optional anpassen, damit Chance-System passt
+    if (GameState.hero) GameState.hero.level = GameState.round;
+    window.__log?.(`<b>Cheat</b>: Runde = ${GameState.round}.`);
+    window.__render?.();
+  };
 
-      GameState.souls -= r.cost;
-      elemsLocal[r.element] = true;
+  // Day setzen
+  inner.querySelector("#cheat-set-day").onclick = () => {
+    const n = Number(inner.querySelector("#cheat-day").value || "1");
+    if (!Number.isFinite(n) || n < 1) return window.__log?.("Ungültiger Tag.");
+    GameState.day = Math.floor(n);
+    window.__log?.(`<b>Cheat</b>: Tag = ${GameState.day}.`);
+    window.__render?.();
+  };
 
-      window.__log?.(
-        `<span class="k">Rune gekauft</span>: ${r.name} (+${r.apply?.elementDamagePct ?? 20}% ${r.element}-Schaden).`
-      );
-      render();
-      showRuneShop();
-    };
+  // Karte spawnen
+  inner.querySelector("#cheat-spawn-card").onclick = () => {
+    const tplId = (inner.querySelector("#cheat-card-id").value || "").trim();
+    const lvl = Math.max(1, Number(inner.querySelector("#cheat-card-lvl").value || "1"));
 
-    grid.appendChild(div);
-  });
+    if (!tplId) return window.__log?.("Bitte Template-ID eingeben.");
 
-  // ---------- Meta-Runen (draw/energy/soul) ----------
-  metaRunes.forEach((r) => {
-    const div = document.createElement("div");
-    div.className = "card shop-card";
-    const ownedKey =
-      r.apply?.drawPerDay ? "draw" :
-      r.apply?.energy     ? "energy" :
-      r.apply?.soulOnKill ? "soul" : null;
-
-    const owned = ownedKey ? !!GameState.runes[ownedKey] : false;
-    const affordable = souls >= r.cost;
-    const disabled = owned || !affordable;
-
-    div.innerHTML = `
-      <div class="badge">Meta</div>
-      <div class="name">${r.name}</div>
-      <div class="desc small">Kosten: ${r.cost} Seelen</div>
-      <div class="desc small ${owned ? "k" : "muted"}">
-        ${owned ? "Aktiv" : ""}
-      </div>
-      <button class="primary" ${disabled ? "disabled" : ""}>Kaufen</button>
-    `;
-
-    const btn = div.querySelector("button");
-    btn.onclick = () => {
-      if (disabled) return;
-      if (GameState.souls < r.cost) {
-        window.__log?.("Nicht genug Seelen.");
-        return;
-      }
-
-      GameState.souls -= r.cost;
-
-      if (r.apply?.drawPerDay) GameState.runes.draw   = true;
-      if (r.apply?.energy)     GameState.runes.energy = true;
-      if (r.apply?.soulOnKill) GameState.runes.soul   = true;
+    try {
+      // templateView wirft Error, wenn es nicht existiert
+      const tpl = templateView(tplId);
+      const inst = newInstance(tplId, lvl);
+      GameState.hand.push(inst);
 
       window.__log?.(
-        `<span class="k">Rune gekauft</span>: ${r.name}.`
+        `<b>Cheat</b>: Karte <b>${tpl.name}</b> (L${lvl}) in die Hand gelegt.`
       );
-      render();
-      showRuneShop();
-    };
+      window.__render?.();
+    } catch (e) {
+      console.error("Cheat spawn error", e);
+      window.__log?.(`Template "${tplId}" nicht gefunden.`);
+    }
+  };
 
-    grid.appendChild(div);
-  });
+  // Debug State
+  inner.querySelector("#cheat-print-state").onclick = () => {
+    console.log("GameState", GameState);
+    window.__log?.("<b>Cheat</b>: GameState in Console geloggt.");
+  };
 
-  const btnClose = inner.querySelector("#btn-close-shop");
-  if (btnClose) btnClose.onclick = () => closeOverlay();
+  // Hand leeren
+  inner.querySelector("#cheat-clear-hand").onclick = () => {
+    GameState.hand = [];
+    window.__log?.("<b>Cheat</b>: Hand geleert.");
+    window.__render?.();
+  };
+
+  // placed leeren
+  inner.querySelector("#cheat-clear-placed").onclick = () => {
+    GameState.placed = new Map();
+    window.__log?.("<b>Cheat</b>: Alle Platzierungen entfernt.");
+    window.__render?.();
+  };
 }
 
 

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "schild_roststahl",
+    "name": "Roststahl-Schild",
+    "mods": { "damageTakenPct": -10 },
+    "lore": "Alt, schwer, zuverlässig – die Klinge rutscht ab wie Regen."
+  }
+]

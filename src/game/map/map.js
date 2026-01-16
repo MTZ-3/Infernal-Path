@@ -9,14 +9,14 @@
 // - Validator-Schleife: rollt neu, bis alles gültig ist
 // - SVG-Render, Heldmarker (klickbar), Klick: Karte platzieren
 //   Karten-Typen:
-//   fluch / s_fluch = direkt auf Held
+
 //   falle / s_falle = Fallen / Zonen auf Map
 //   dorf            = nur auf Dörfer
 //   dungeon         = nur auf Dungeons
 // ============================================================================
 
 import { GameState, rand, uid } from "../core/gameState.js";
-import { playCard, instView, isHeroCard } from "../cards/cards.js";
+import { playCard, instView } from "../cards/cards.js";
 
 let _svg, _nodesG, _linksG, _heroDot;
 
@@ -252,7 +252,6 @@ export function renderMap() {
       "stroke-width": 2
     });
     _heroDot.style.cursor = "pointer";
-    _heroDot.addEventListener("click", onHeroClick);
     _svg.appendChild(_heroDot);
   }
   const H = nodeById(GameState.heroPos);
@@ -293,11 +292,7 @@ function onNodeClick(node) {
   const view = instView(inst);
   const type = view.type;
 
-  // Heldenkarten gehören NICHT auf die Map
-  if (type === "fluch" || type === "s_fluch") {
-    window.__log?.("Diese Karte musst du direkt auf den Helden wirken (klicke auf den Heldmarker).");
-    return;
-  }
+ 
 
   // Nur Nodes akzeptieren, die wirklich gültig sind
   if (!isNodeValidForInst(node, inst)) {
@@ -352,11 +347,7 @@ function onHeroClick() {
     return;
   }
 
-  // Prüfen, ob diese Instanz eine Heldenkarte ist (fluch / s_fluch)
-  if (!isHeroCard(inst)) {
-    window.__log?.("Diese Karte kann nicht direkt auf den Helden gespielt werden – lege sie auf die Karte.");
-    return;
-  }
+
 
   const view = instView(inst);
   const beforeEnergy = GameState.energy;
@@ -383,8 +374,6 @@ function onHeroClick() {
 // ============================================================================
 //
 // Kartentypen:
-// fluch    -> hero (nur Held)
-// s_fluch  -> hero (nur Held)
 // falle    -> Map, aber NICHT auf Dorf/Dungeon/Schloss
 // s_falle  -> NUR freie Wegfelder (kind == null)
 // dorf     -> NUR village
@@ -394,7 +383,6 @@ function placementForInst(inst) {
   const view = instView(inst);
   const type = view.type;
 
-  if (type === "fluch" || type === "s_fluch") return "hero";
   if (type === "falle" || type === "s_falle") return "trap";
   if (type === "dorf") return "village";
   if (type === "dungeon") return "dungeon";
@@ -406,37 +394,38 @@ function isNodeValidForInst(node, inst) {
   const view = instView(inst);
   const type = view.type;
 
-  // Heldenkarten gehören nicht auf die Map
-  if (type === "fluch" || type === "s_fluch") {
+  const entries = GameState.placed.get(node.id) || [];
+  const already = entries.length > 0;
+
+  // Dorf/Dungeon: nur 1 Karte pro Feld (egal was)
+  if (already && (node.kind === "village" || node.kind === "dungeon")) {
     return false;
   }
 
-  // Normale Fallen: alles außer Schloss, Dorf, Dungeon
+  // Passive sind nicht spielbar (sollte playCard auch blocken)
+  if (type === "passiv") return false;
+
+  // Fallen: nur normale Felder + Start (aber NICHT Dorf/Dungeon/Schloss)
   if (type === "falle") {
     if (node.kind === "castle") return false;
     if (node.kind === "village") return false;
     if (node.kind === "dungeon") return false;
-    // Start + freie Felder sind okay
     return true;
   }
 
-  // Sonder-Fallen: nur wirklich freie Felder (kein Start, kein Dorf, kein Dungeon, kein Schloss)
-  if (type === "s_falle") {
-    return node.kind == null;
-  }
-
-  // Dorf-Karten: nur Dörfer
+  // Dorfkarten: nur auf Dorf und nur wenn leer (already ist oben schon abgefangen)
   if (type === "dorf") {
     return node.kind === "village";
   }
 
-  // Dungeon-Karten: nur Dungeons
+  // Dungeonkarten: nur auf Dungeon und nur wenn leer
   if (type === "dungeon") {
     return node.kind === "dungeon";
   }
 
   return false;
 }
+
 
 // ============================================================================
 // Helpers: Graph, SVG, Layout
@@ -469,6 +458,9 @@ function kindFill(kind) {
   if (kind === "dungeon") return "#2b1f33";
   if (kind === "castle")  return "#2a243a";
   if (kind === "start")   return "#1a1e2a";
+  if (kind === "ruined_village") return "#3a1f1f";
+  if (kind === "ruined_dungeon") return "#2a1a1a";
+
   return "#0b0b12";
 }
 
