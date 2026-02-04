@@ -1,0 +1,51 @@
+[
+  {
+    "id": "schild_roststahl",
+    "name": "Roststahl-Schild",
+    "mods": { "damageTakenPct": -10 },
+    "lore": "Alt, schwer, zuverlässig – die Klinge rutscht ab wie Regen."
+  },
+  {
+    "id": "totem_50",
+    "name": "Totem der Wiederkehr",
+    "mods": {},
+    "lore": "Rettet den Helden einmalig vor dem Tod und stellt 50% HP wieder her."
+  },
+
+  {
+    "id": "item_banner_resolve",
+    "name": "Banner der Entschlossenheit",
+    "mods": {},
+    "lore": "Wo dieses Banner weht, versteinert der Mut zu Stahl."
+  },
+  {
+    "id": "item_regen_ring",
+    "name": "Ring der Regeneration",
+    "mods": {},
+    "lore": "Fleisch schließt sich, als hätte es nie geblutet."
+  },
+  {
+    "id": "item_ward_of_equilibrium",
+    "name": "Siegel des Gleichgewichts",
+    "mods": {},
+    "lore": "Es löscht die eine Schwäche aus – und füttert dafür den Stolz."
+  },
+  {
+    "id": "item_ice_shell",
+    "name": "Splitterpanzer",
+    "mods": {},
+    "lore": "Eis trägt die Wunden, bevor sie den Körper erreichen."
+  },
+  {
+    "id": "item_blood_pact",
+    "name": "Blutpakt-Siegel",
+    "mods": {},
+    "lore": "Wenn das Blut dünn wird, zieht es neue Kraft aus der Tiefe."
+  },
+  {
+    "id": "item_alert_helm",
+    "name": "Helm der Wachsamkeit",
+    "mods": {},
+    "lore": "Kein Zufall ist zufällig, wenn dieser Blick darüber wacht."
+  }
+]

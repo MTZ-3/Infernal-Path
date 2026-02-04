@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { GameState, BASE_ENERGY, BASE_DRAW} from "../game/core/gameState.js";
-import { playCard, instView, newInstance, drawCards, sacrifice, bindLogger as bindCardLogger, scaledValue, computePassiveBonuses} from "../game/cards/cards.js";
+import { playCard, instView, newInstance, drawCards, sacrifice, bindLogger as bindCardLogger, scaledValue, computePassiveBonuses, templateView} from "../game/cards/cards.js";
 import { renderMap } from "../game/map/map.js";
 import { endDay } from "../game/core/turns.js";
 
@@ -20,6 +20,17 @@ import { endDay } from "../game/core/turns.js";
 // Kleine Helper
 // ============================================================================
 
+function formatDescFromInst(inst) {
+  const v = instView(inst);
+  const val = Math.max(1, Math.floor(scaledValue(inst)));
+  return (v.desc || "").replaceAll("{value}", String(val));
+}
+
+function formatDescFromTemplate(tpl, level = 1) {
+  const fakeInst = { tplId: tpl.id, level };
+  const val = Math.max(1, Math.floor(scaledValue(fakeInst)));
+  return (tpl.desc || "").replaceAll("{value}", String(val));
+}
 
 
 
@@ -195,10 +206,10 @@ function onAltarClick() {
     return;
   }
 
-  const candidates = hand.filter((c) => c.uid !== sac.uid);
+  const candidates = hand.filter((c) => c.uid !== sac.uid && instView(c).type !== "passiv");
   if (!candidates.length) {
     window.__log?.(
-      "Keine andere Karte in der Hand zum Verstärken gefunden."
+      "Keine andere Karte in der Hand zum Verstärken (nur passive Karten) gefunden."
     );
     return;
   }
@@ -239,16 +250,119 @@ export function render() {
   const stats = document.querySelector("#stats");
   if (!stats) return;
 
-  const h = s.hero;
+    const h = s.hero;
   let heroStatus = "kein Held";
+
   if (h) {
-    const strong = h.strongElement ? `🔺${h.strongElement}` : "";
-    const weak = h.weakElement ? `🔻${h.weakElement}` : "";
-    const tags = [strong, weak].filter(Boolean).join(" ");
-    heroStatus = `<b>${h.name}</b> – HP ${h.hp}/${h.maxHp} – ${
-      h.alive !== false ? "Lebt" : "Tot"
-    }${tags ? " • " + tags : ""}`;
+    const rev = h.revealed || {};
+    const showStrong = !!rev.strongElement;
+    const showWeak   = !!rev.weakElement;
+    const showAbil   = !!rev.ability;
+    const showMaxHp  = !!rev.maxHp;
+
+    const hpNow = Number.isFinite(h.hp) ? h.hp : 0;
+    const hpMax = Number.isFinite(h.maxHp) ? h.maxHp : 1;
+
+    const hpTxt = showMaxHp ? `HP ${hpNow}/${hpMax}` : `HP ?/?`;
+
+    const tags = [
+      showStrong && h.strongElement ? `🔺${h.strongElement}` : "",
+      showWeak   && h.weakElement   ? `🔻${h.weakElement}`   : "",
+    ].filter(Boolean).join(" ");
+
+    const abilTxt = showAbil && h.abilityName ? ` • Fähigkeit: ${h.abilityName}` : ` • Fähigkeit: ?`;
+
+    heroStatus =
+      `<b id="hero-name" style="cursor:pointer">${h.name}</b> – ${hpTxt}` +
+      `${tags ? " • " + tags : ""}` +
+      ` • 🎒 <span id="hero-inv" style="cursor:pointer">Inventar</span>` +
+      ` • ✨ <span id="hero-eff" style="cursor:pointer">Effekte</span>` +
+      abilTxt;
   }
+
+
+  // ---- Click: Held umbenennen ----
+  const heroNameEl = document.querySelector("#hero-name");
+  if (heroNameEl && GameState.hero) {
+    heroNameEl.onclick = () => {
+      openOverlay();
+      const inner = document.querySelector("#overlay-inner");
+      const current = GameState.hero?.name || "";
+
+      inner.innerHTML = `
+        <h2>Held umbenennen</h2>
+        <div class="panel">
+          <div class="small muted">Neuer Name:</div>
+          <input id="hero-rename" value="${current}"
+            style="width:100%;padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#141322;color:#e7e4f2" />
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button id="hero-rename-save" class="primary">Speichern</button>
+            <button id="hero-rename-cancel" class="warn">Abbrechen</button>
+          </div>
+        </div>
+      `;
+
+      inner.querySelector("#hero-rename-save").onclick = () => {
+        const v = inner.querySelector("#hero-rename").value.trim();
+        if (v) GameState.hero.name = v;
+        closeOverlay();
+        window.__render?.();
+      };
+      inner.querySelector("#hero-rename-cancel").onclick = () => closeOverlay();
+    };
+  }
+
+  // ---- Click: Inventar ----
+  const invEl = document.querySelector("#hero-inv");
+  if (invEl && GameState.hero) {
+    invEl.onclick = () => {
+      openOverlay();
+      const inner = document.querySelector("#overlay-inner");
+
+      const ids = Array.isArray(GameState.hero.items) ? GameState.hero.items : [];
+      const all = window.__ITEMS || [];
+      const named = ids.map(id => all.find(x => x.id === id)?.name || id);
+
+      inner.innerHTML = `
+        <h2>Inventar</h2>
+        <div class="panel">
+          ${named.length ? `<ul>${named.map(n => `<li>${n}</li>`).join("")}</ul>` : `<div class="small muted">Keine Items.</div>`}
+          <button id="close" class="warn" style="margin-top:10px">Schließen</button>
+        </div>
+      `;
+      inner.querySelector("#close").onclick = () => closeOverlay();
+    };
+  }
+
+  // ---- Click: Effekte ----
+  const effEl = document.querySelector("#hero-eff");
+  if (effEl && GameState.hero) {
+    effEl.onclick = () => {
+      openOverlay();
+      const inner = document.querySelector("#overlay-inner");
+
+      const effs = Array.isArray(GameState.hero.effects) ? GameState.hero.effects : [];
+      const defs = window.__EFFECTS || [];
+
+      const lines = effs.map(e => {
+        const def = defs.find(d => d.id === e.id);
+        const name = def?.name || e.id;
+        const stacks = e.stacks ?? 1;
+        const days = e.daysLeft == null ? "∞" : e.daysLeft;
+        return `<li><b>${name}</b> ×${stacks} <span class="small muted">(Tage: ${days})</span></li>`;
+      });
+
+      inner.innerHTML = `
+        <h2>Aktive Effekte</h2>
+        <div class="panel">
+          ${lines.length ? `<ul>${lines.join("")}</ul>` : `<div class="small muted">Keine aktiven Effekte.</div>`}
+          <button id="close" class="warn" style="margin-top:10px">Schließen</button>
+        </div>
+      `;
+      inner.querySelector("#close").onclick = () => closeOverlay();
+    };
+  }
+
 
   stats.innerHTML = `
     <b>Tag ${s.day}</b> |
@@ -278,10 +392,10 @@ export function render() {
     div.className = "card";
     div.draggable = true;
     div.innerHTML = `
-      <div class="cost">L${inst.level || 1}</div>
+      <div class="cost">${c.type === "passiv" ? "" : `L${inst.level || 1}`}</div>
       <div class="badge">${c.type}</div>
       <div class="name">${c.name}</div>
-      <div class="desc small">${c.desc}</div>
+      <div class="desc small">${formatDescFromTemplate(c, 1)}</div>
       ${
         preview
           ? `<div class="mini small muted">${preview}</div>`
@@ -506,7 +620,7 @@ export function showLobby(allCards) {
         <div class="badge">${c.type}</div>
         <div class="name">${c.name}</div>
         <div class="mini">${c.id}</div>
-        <div class="desc small">${c.desc}</div>
+        <div class="desc small">${formatDescFromTemplate(c, 1)}</div>
         ${
           preview
             ? `<div class="mini small muted">${preview}</div>`
@@ -542,6 +656,7 @@ export function showShop(allCards) {
 
   openOverlay();
 
+  // --- Passiv-Boni ---
   const pass = computePassiveBonuses();
   const extraSlots = pass.shopSlotsBonus || 0;
   const slots = 3 + extraSlots;
@@ -549,14 +664,21 @@ export function showShop(allCards) {
   // Pool: nur Passiv-Karten
   const passives = (allCards || []).filter(c => c.type === "passiv");
 
-  // Hilfsfunktion: Picks neu würfeln
-  const rollOffers = () => shuffleArray(passives).slice(0, Math.min(slots, passives.length));
-
-  // Rerolls pro Tag (gratis durch passive_free_reroll)
+  // State init
   GameState.mods = GameState.mods || {};
   if (GameState.mods.freeRerollsLeft == null) GameState.mods.freeRerollsLeft = 0;
 
-  let offers = rollOffers();
+  // Hilfsfunktion: Picks neu würfeln
+  const rollOffers = () => shuffleArray(passives).slice(0, Math.min(slots, passives.length));
+
+  // ✅ Auto-Refresh pro Runde (Held gestorben => round changed => neue offers)
+  if (GameState.mods.shopOffersRound !== (GameState.round ?? 1)) {
+    GameState.mods.shopOffersRound = (GameState.round ?? 1);
+    GameState.mods.shopOffers = rollOffers();
+  }
+
+  // offers aus State lesen (damit es beim Schließen/Öffnen gleich bleibt)
+  let offers = Array.isArray(GameState.mods.shopOffers) ? [...GameState.mods.shopOffers] : rollOffers();
 
   const renderShop = () => {
     const souls = GameState.souls ?? 0;
@@ -581,14 +703,19 @@ export function showShop(allCards) {
 
     const grid = inner.querySelector("#shop-grid");
 
+    // falls alle weggekauft: kleine Info
+    if (!offers.length) {
+      grid.innerHTML = `<div class="panel small muted">Ausverkauft. Nutze Reroll oder warte auf die nächste Runde.</div>`;
+    }
+
     offers.forEach((tpl) => {
-      const level = GameState.round ?? 1;
-      const shopCost = Math.max(0, Math.round(tpl.shopCost ?? 6));
+      const shopCost  = Math.max(0, Math.round(tpl.shopCost ?? 6));
       const finalCost = shopCost + (GameState.mods?.shopPenalty || 0);
 
       const preview = (() => {
-        const fakeInst = { tplId: tpl.id, level };
-        // du hast schon effectPreviewFromInst, wenn du willst nutz das.
+        // Passive skalieren bei dir eh nicht wirklich (growth 0),
+        // aber wir lassen es drin, falls du später bases ändern willst.
+        const fakeInst = { tplId: tpl.id, level: 1 };
         const val = Math.max(1, Math.floor(scaledValue(fakeInst)));
         const kind = tpl.effect?.kind;
 
@@ -596,7 +723,7 @@ export function showShop(allCards) {
         if (kind === "passive_per_element_pct") return `+${tpl.effect?.base ?? val}% pro Element`;
         if (kind === "passive_dot_pct") return `+${tpl.effect?.base ?? val}% DoT`;
         if (kind === "passive_dot_days") return `DoT +${tpl.effect?.base ?? val} Tag(e)`;
-        if (kind === "passive_lowhp_taken_pct") return `+${tpl.effect?.base ?? val}% unter ${(tpl.effect?.threshold ?? 0.3)*100}% HP`;
+        if (kind === "passive_lowhp_taken_pct") return `+${tpl.effect?.base ?? val}% unter ${(tpl.effect?.threshold ?? 0.3) * 100}% HP`;
         if (kind === "passive_draw") return `+${tpl.effect?.base ?? val} Handkarte`;
         if (kind === "passive_energy") return `+${tpl.effect?.base ?? val} Energie`;
         if (kind === "passive_souls_pct") return `+${tpl.effect?.base ?? val}% Seelen`;
@@ -626,14 +753,19 @@ export function showShop(allCards) {
         GameState.souls -= finalCost;
         if (GameState.mods?.shopPenalty) GameState.mods.shopPenalty = 0; // “nächster Einkauf”
 
-        const inst = newInstance(tpl.id, level);
+        // ✅ Passive Karten ohne Level -> immer level 1
+        const inst = newInstance(tpl.id, 1);
         GameState.deck.push(inst);
-        // optional mischen:
-        // shuffleInPlace(GameState.deck);
 
-        window.__log?.(`<span class="k">Gekauft</span>: <b>${tpl.name}</b> (L${level}) ins Deck.`);
+        // ✅ Gekaufte Karte aus Shop entfernen
+        offers = offers.filter(x => x.id !== tpl.id);
+
+        // ✅ In State zurückschreiben, damit es auch nach schließen so bleibt
+        GameState.mods.shopOffers = [...offers];
+
+        window.__log?.(`<span class="k">Gekauft</span>: <b>${tpl.name}</b> ins Deck.`);
         window.__render?.();
-        renderShop(); // refresh
+        renderShop(); // refresh (zeigt dann nur noch die restlichen)
       };
 
       grid.appendChild(div);
@@ -646,11 +778,12 @@ export function showShop(allCards) {
       if ((GameState.mods.freeRerollsLeft || 0) > 0) {
         GameState.mods.freeRerollsLeft--;
         offers = rollOffers();
+        GameState.mods.shopOffers = [...offers];
         renderShop();
         return;
       }
 
-      // 2) sonst kostet reroll z.B. 2 seelen (kannst du später ändern)
+      // 2) sonst kostet reroll z.B. 2 seelen
       const rerollCost = 2;
       if ((GameState.souls ?? 0) < rerollCost) {
         window.__log?.("Nicht genug Seelen für Reroll.");
@@ -658,12 +791,14 @@ export function showShop(allCards) {
       }
       GameState.souls -= rerollCost;
       offers = rollOffers();
+      GameState.mods.shopOffers = [...offers];
       renderShop();
     };
   };
 
   renderShop();
 }
+
 
 
 // ============================================================================
@@ -694,10 +829,18 @@ function openCheatPanel() {
       <div class="lobby-grid" style="grid-template-columns:1fr;">
         <div class="panel">
           <h3>Held</h3>
+          <button id="cheat-reveal-one">👁 Reveal 1 zufällig</button>
+          <button id="cheat-toggle-revealall">👁 Toggle: Alles sichtbar</button>
           <button id="cheat-kill-hero" class="warn">Held sofort töten (endDay)</button>
           <button id="cheat-freeze-hero">Held einfrieren (+1 Tag)</button>
           <button id="cheat-heal-hero">Held voll heilen</button>
         </div>
+
+        <div class="panel">
+          <h3>Fähigkeit wählen (Held neu spawnen)</h3>
+          <div id="cheat-abilities" class="grid"></div>
+        </div>
+
 
         <div class="panel">
           <h3>Run / Werte</h3>
@@ -766,6 +909,40 @@ function openCheatPanel() {
     try { endDay(); } catch (e) { console.error("endDay crash (cheat)", e); }
     window.__render?.();
   };
+
+  // Helde fähikeit 
+  const abilGrid = inner.querySelector("#cheat-abilities");
+  const abilities = window.__HERO_ABILITIES || [];
+
+  abilities.forEach(a => {
+    const btn = document.createElement("button");
+    btn.textContent = a.name;
+    btn.onclick = () => {
+      // aktuellen Held töten
+      if (GameState.hero) GameState.hero.hp = 0;
+
+      // neue Runde erzwingen
+      GameState.round = Math.max(1, (GameState.round || 1));
+
+      // neuen Held mit gewählter Fähigkeit spawnen
+      window.__spawnHeroWithAbility?.(a);
+
+      closeOverlay();
+      window.__log?.(`<b>Cheat</b>: Neuer Held mit Fähigkeit <b>${a.name}</b>`);
+    };
+    abilGrid.appendChild(btn);
+  });
+
+  // SIchbar machen
+  inner.querySelector("#cheat-reveal-one").onclick = () => {
+    window.__cheatRevealOne?.();
+    window.__render?.();
+    };
+
+    inner.querySelector("#cheat-toggle-revealall").onclick = () => {
+    window.__cheatToggleRevealAll?.();
+    };
+
 
   // Freeze +1 Tag
   inner.querySelector("#cheat-freeze-hero").onclick = () => {
@@ -945,5 +1122,27 @@ function shuffleInPlace(a) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+// ============================================================================
+// Karten schade mitgehen zum Level
+// ============================================================================
+
+function formatCardDesc(inst) {
+  const v = instView(inst);
+  const tpl = v; // instView liefert schon template + level
+
+  const val = Math.max(1, Math.floor(scaledValue(inst)));
+
+  // Default: original desc wenn kein Platzhalter drin
+  let desc = tpl.desc || "";
+
+  // Unterstütze {value}
+  desc = desc.replaceAll("{value}", String(val));
+
+  // Optional: falls du später mehr willst
+  // desc = desc.replaceAll("{level}", String(inst.level || 1));
+
+  return desc;
 }
 

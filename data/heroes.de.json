@@ -1,9 +1,178 @@
-[
 {
-"id":"blutjaeger",
-"name":"Der Blutjäger",
-"maxHp":20,
-"baseSpeed":1,
-"passives":[{"id":"raserei","desc":"Bei 50% HP doppelte Bewegung."}]
+  "names": [
+    "Arvel der Nachtträger",
+    "Dornrath der Eisenpfad",
+    "Velmor der Sucher",
+    "Kraylen aus dem Moor",
+    "Elyndor der Winterfluch",
+    "Tharos Blutfaust",
+    "Kaelwyn der Schweigsame",
+    "Morvak aus den Tiefen",
+    "Rethan Seelensammler",
+    "Ulric der Verbrannte",
+    "Zareth Eisenblick",
+    "Vornak der Pfadbrecher",
+    "Ilvren Schattenhand",
+    "Gorath der Gebrochene",
+    "Nerath Blutrufer",
+    "Sivrek der Kalte",
+    "Balor Aschenherz",
+    "Xerun der Letzte",
+    "Thyra Nebelpfad",
+    "Korveth der Verdammte",
+    "Lyris Nachtsang",
+    "Draegon der Kettenlose",
+    "Valkor Dornwall",
+    "Aenir Schattenfluch",
+    "Borik der Unerbittliche",
+    "Zyra Blutmond",
+    "Kalthos Eisenmal",
+    "Nivor der Rufer",
+    "Eskar der Verlorene",
+    "Moriel Seelenbrand",
+    "Ragnar Aschenpfad",
+    "Helgor der Standhafte",
+    "Vaelin Sturmfluch",
+    "Nyxara Nachtblick",
+    "Draven der Entweihte",
+    "Solvar der Blinde",
+    "Ithar Frostgang",
+    "Malrik Blutzeichen",
+    "Kyras der Grenzgänger",
+    "Orin Aschensohn",
+    "Virex Schattenpfad",
+    "Aldren Dornherz",
+    "Skarn der Eisenwolf",
+    "Belith Seelensplitter",
+    "Rovan der Graue",
+    "Thalek Knochensang",
+    "Zorin Nachtklaue",
+    "Ereth der Schweigende",
+    "Korga Blutmantel",
+    "Luthar der Unbeugsame",
+    "Ysil Nebelherz",
+    "Damar Schattenrichter",
+    "Korun der Flammenlose",
+    "Veska Seelenwacht",
+    "Harkon der Alte",
+    "Neralis Dunkelpfad",
+    "Xandar Eisenfluch",
+    "Riven Aschenschritt",
+    "Thorin der Verfemte",
+    "Calreth Blutstern",
+    "Ilyas Nachtwanderer",
+    "Zarok der Tiefenblick",
+    "Mirel Schattenhain",
+    "Boran der Pfadlose",
+    "Selene Aschenlied",
+    "Drakor Eisenhauch",
+    "Valen der Verlorene",
+    "Keshar Blutflüstern",
+    "Nyrel Seelenpfad",
+    "Orvak der Grimmige",
+    "Talryn Schattenblick",
+    "Varek Dornfaust",
+    "Ishra Nachtwind",
+    "Morlen der Stille",
+    "Kharos Seelenbrand",
+    "Edrin Eisenmal",
+    "Xyra der Blutfall",
+    "Rokan der Schattenlose",
+    "Faelar Nebeltritt",
+    "Garruk Aschenzorn",
+    "Velis Nachtzeichen",
+    "Zethar der Knochenträger",
+    "Lorkan Blutspur",
+    "Sareth der Unruhige",
+    "Korin Eisenpfad",
+    "Yorin Schattenrufer",
+    "Ashara Dämmerherz",
+    "Tharek der Grenzwächter",
+    "Noxis Blutblick",
+    "Ivar der Schweigsame",
+    "Calis Nachtpfad",
+    "Vorren Eisenstimme",
+    "Elyra Schattenkranz",
+    "Drystan Aschenblick",
+    "Khalor der Pfadbrecher",
+    "Neris Seelenfluch",
+    "Valtor Nachtfrost",
+    "Raska Blutpfad",
+    "Zorin der Leere",
+    "Morthas Eisenwille",
+    "Ilara Schattenlied",
+    "Grynn Aschenträger",
+    "Thalos der Vergessene",
+    "Nyssa Blutmond",
+    "Kovar der Endlose",
+    "Jodarium der Gaminggott"
+  ],
+
+  "abilities": [
+    {
+      "id": "iron_flesh",
+      "name": "Eisenfleisch",
+      "desc": "Der Held kann pro Tag maximal 25% seines MaxHP durch Schaden verlieren."
+    },
+    {
+      "id": "self_heal",
+      "name": "Selbstheilung",
+      "desc": "Der Held heilt sich am Ende jedes Tages um 5% seines MaxHP."
+    },
+    {
+      "id": "damage_armor",
+      "name": "Schadenspanzer",
+      "desc": "Direktschaden wird um 25% reduziert, DoTs wirken normal."
+    },
+    {
+      "id": "unyielding_will",
+      "name": "Unsterblicher Wille",
+      "desc": "Der Held kann durch Direktschaden nicht unter 1 HP fallen."
+    },
+    {
+      "id": "blood_rush",
+      "name": "Blutrausch",
+      "desc": "Unter 30% HP bewegt sich der Held doppelt so weit."
+    },
+    {
+      "id": "cold_mind",
+      "name": "Kalte Berechnung",
+      "desc": "Der Held ignoriert alle DoTs für die ersten 2 Tage."
+    },
+    {
+      "id": "curse_immunity",
+      "name": "Fluchabwehr",
+      "desc": "Der Held kann keine negativen Effekte erhalten."
+    },
+    {
+      "id": "pain_distortion",
+      "name": "Schmerzverzerrung",
+      "desc": "DoT-Schaden +25%, Direktschaden −25%."
+    },
+    {
+      "id": "village_blessing",
+      "name": "Dorfsegen",
+      "desc": "Beim Betreten eines Dorfes heilt der Held zusätzlich 10 temporäre HP."
+    },
+    {
+      "id": "shadow_filter",
+      "name": "Schattenfilter",
+      "desc": "Flächenschaden trifft den Helden nur zu 50%."
+    },
+    {
+      "id": "desperation_heal",
+      "name": "Verzweiflungsheilung",
+      "desc": "Unter 20% HP heilt sich der Held täglich um 8% seines MaxHP."
+    },
+    {
+      "id": "element_void",
+      "name": "Elementarleere",
+      "desc": "Der Held ist immun gegen Schaden seines starken Elements."
+    },
+    {
+      "id": "colossus_blood",
+      "name": "Kolossblut",
+      "desc": "Der Held besitzt 20% mehr MaxHP."
+    }
+  ]
 }
-]

@@ -17,6 +17,8 @@
 
 import { GameState, rand, uid } from "../core/gameState.js";
 import { playCard, instView } from "../cards/cards.js";
+import { heroHasAbility } from "../hero/hero.js";
+
 
 let _svg, _nodesG, _linksG, _heroDot;
 

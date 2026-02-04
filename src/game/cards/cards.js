@@ -1,99 +1,33 @@
 // src/game/cards/cards.js
 // ============================================================================
 // Karten-Engine (instanzbasiert)
-// ----------------------------------------------------------------------------
-// - Templates in einer Library (TPL)
+// - Templates in Library (TPL)
 // - Deck/Hand bestehen aus Instanzen { uid, tplId, level }
-// - Karten werden (meist) nach dem Spielen ins Deck zurückgemischt
-// - Opferung entfernt Instanzen endgültig
-//
-// DEINE REGELN (aktuell):
-// - Dorf/Dungeon: chance_event mit 2 Outcomes (playerWin / heroWin)
-// - Auf Dorf/Dungeon-Feld darf nur 1 Karte liegen
-// - Fallen/Zone lösen beim Betreten aus (triggerNode)
+// - triggerNode führt Fallen + chance_event aus
 // ============================================================================
 
 import { GameState, uid, clamp } from "../core/gameState.js";
-import { runActions, onChanceEventResolved } from "../effects/effects.js";
+import { onChanceEventResolved } from "../effects/effects.js";
+import { applyDamage, applyHeal, heroHasItem } from "../hero/hero.js";
 
 // ==============================
-// Element-Logik (Held Resists/Weak)
+// Element-Faktor (weak/resist/immune)
 // ==============================
 
 export function elementalFactorFor(hero, element) {
   if (!hero || !element) return 1;
 
-  // Immun check
   const immune = hero.status?.immuneElements || [];
-  if (immune.includes(element)) return 0;
+  if (Array.isArray(immune) && immune.includes(element)) return 0;
 
   let f = 1;
-  if (hero.weakElement && hero.weakElement === element) f *= 2;
-  if (hero.strongElement && hero.strongElement === element) f *= 0.5;
+  if (hero.weakElement === element) f *= 2;
+  if (hero.strongElement === element) f *= 0.5;
   return f;
 }
 
-
-function computeFinalDamage(base, element, cardOrInst = null) {
-  const h = GameState.hero;
-  const pass = computePassiveBonuses();
-
-  let dmg = Math.max(0, Math.round(base));
-
-  // Element-Faktor (weak/resist/immune)
-  let factor = elementalFactorFor(h, element);
-  if (cardOrInst) factor *= elementDamageMultiplier(cardOrInst);
-
-  // passive: element bonus
-  if (element && pass.elemPct[element]) factor *= (1 + pass.elemPct[element] / 100);
-
-  // passive: per-element bonus (zählt Elemente der Karte)
-  if (cardOrInst) {
-    const t = cardOrInst?.tplId ? tplById(cardOrInst.tplId) : cardOrInst;
-    const nElems = (t?.elements || []).length;
-    if (nElems > 0 && pass.perElementPct) factor *= (1 + (pass.perElementPct * nElems) / 100);
-  }
-
-  // passive: low hp bonus (mehr Schaden, wenn Held low)
-  if (h && h.maxHp > 0) {
-    const hpRatio = (h.hp ?? 0) / h.maxHp;
-    if (hpRatio <= pass.lowHpThreshold && pass.lowHpDamagePct) {
-      factor *= (1 + pass.lowHpDamagePct / 100);
-    }
-  }
-
-  // status: vuln/resist (additiv als DamageTaken-Mod)
-  const vuln = h?.status?.vuln?.pct || 0;
-  const resist = h?.status?.resist?.pct || 0;
-  factor *= (1 + vuln / 100);
-  factor *= (1 - resist / 100);
-
-  // status: trap_buff (nur einmalig, wird beim Trigger konsumiert – das machen wir unten)
-  // -> hier NICHT pauschal, sondern im Trigger
-
-  const final = Math.max(0, Math.round(dmg * factor));
-  return final;
-}
-
-function elementDamageMultiplier(_cardOrInst) {
-  return 1;
-}
-
-function computeElementalDamage(base, element, cardOrInst = null) {
-  const h = GameState.hero;
-  let factor = elementalFactorFor(h, element);
-  if (cardOrInst) factor *= elementDamageMultiplier(cardOrInst);
-  return Math.max(0, Math.round(base * factor));
-}
-
-function logElementHit(label, base, final, element) {
-  const elemTxt = element ? ` (${element})` : "";
-  if (final === base) log(`${label}: ${final} Schaden${elemTxt}.`);
-  else log(`${label}: ${base}→${final} Schaden${elemTxt}.`);
-}
-
 // ==============================
-// Library / Meta
+// Library
 // ==============================
 
 const TPL = new Map();
@@ -113,8 +47,7 @@ export function templateView(tplId) {
   return tplById(tplId);
 }
 
-// Dein map.js importiert das noch. Da es keine Heldkarten mehr gibt,
-// exportieren wir es als "immer false" (Crashfix).
+// kompat: keine Heldkarten mehr
 export function isHeroCard(_inst) {
   return false;
 }
@@ -133,7 +66,7 @@ export function instView(inst) {
 }
 
 // ==============================
-// Skalierung (linear / log / cap)
+// Skalierung
 // ==============================
 
 export function scaledValue(cardOrInst) {
@@ -148,15 +81,13 @@ export function scaledValue(cardOrInst) {
     return Math.min(val, cap);
   }
 
-  // linear
   return (e.base || 0) + (level - 1) * (e.growth || 0);
 }
 
 // ==============================
-// Passive-Boni (Kompatibilität)
+// Passive-Boni (aus Deck/Hand/Discard)
 // ==============================
-// Falls du passive Karten im Deck hast, die z.B. mehr Draw/Energy geben.
-// Du kannst hier später neue passive kinds hinzufügen.
+
 export function computePassiveBonuses() {
   const all = [GameState.deck, GameState.hand, GameState.discard];
 
@@ -164,14 +95,14 @@ export function computePassiveBonuses() {
     drawBonus: 0,
     energyBonus: 0,
 
-    
     soulsGainPct: 0,
     dotPct: 0,
     dotDaysBonus: 0,
+
     lowHpDamagePct: 0,
     lowHpThreshold: 0.3,
 
-    elemPct: { feuer:0, eis:0, blut:0, schatten:0, natur:0, licht:0 },
+    elemPct: { feuer: 0, eis: 0, blut: 0, schatten: 0, natur: 0, licht: 0 },
     perElementPct: 0,
 
     sacrificeLevelBonus: 0,
@@ -182,7 +113,7 @@ export function computePassiveBonuses() {
   };
 
   for (const arr of all) {
-    for (const inst of arr) {
+    for (const inst of arr || []) {
       if (!inst?.tplId) continue;
       const t = tplById(inst.tplId);
       if (t.type !== "passiv") continue;
@@ -207,9 +138,7 @@ export function computePassiveBonuses() {
         if (el && out.elemPct[el] != null) out.elemPct[el] += val;
       }
 
-      else if (kind === "passive_per_element_pct") {
-        out.perElementPct += val;
-      }
+      else if (kind === "passive_per_element_pct") out.perElementPct += val;
 
       else if (kind === "passive_sacrifice_level") out.sacrificeLevelBonus += val;
       else if (kind === "passive_shop_slots") out.shopSlotsBonus += val;
@@ -222,9 +151,50 @@ export function computePassiveBonuses() {
   return out;
 }
 
+// ==============================
+// Damage-Berechnung zentral (für Fallen/Events)
+// ==============================
+
+function computeFinalDamage(base, element, cardOrInst = null) {
+  const h = GameState.hero;
+  const pass = computePassiveBonuses();
+
+  let dmg = Math.max(0, Math.round(base));
+  let factor = elementalFactorFor(h, element);
+
+  // passive: element bonus
+  if (element && pass.elemPct?.[element]) {
+    factor *= (1 + pass.elemPct[element] / 100);
+  }
+
+  // passive: per-element bonus (Elemente der Karte)
+  if (cardOrInst) {
+    const t = cardOrInst?.tplId ? tplById(cardOrInst.tplId) : cardOrInst;
+    const nElems = (t?.elements || []).length;
+    if (nElems > 0 && pass.perElementPct) {
+      factor *= (1 + (pass.perElementPct * nElems) / 100);
+    }
+  }
+
+  // passive: low hp bonus (mehr Schaden, wenn Held low)
+  if (h && h.maxHp > 0) {
+    const hpRatio = (h.hp ?? 0) / h.maxHp;
+    if (hpRatio <= (pass.lowHpThreshold ?? 0.3) && pass.lowHpDamagePct) {
+      factor *= (1 + pass.lowHpDamagePct / 100);
+    }
+  }
+
+  // status: vuln/resist
+  const vuln = h?.status?.vuln?.pct || 0;
+  const resist = h?.status?.resist?.pct || 0;
+  factor *= (1 + vuln / 100);
+  factor *= (1 - resist / 100);
+
+  return Math.max(0, Math.round(dmg * factor));
+}
 
 // ==============================
-// Logging-Hook (UI)
+// Logger
 // ==============================
 
 let _logCb = null;
@@ -233,8 +203,14 @@ export function bindLogger(fn) {
 }
 const log = (msg) => _logCb?.(msg);
 
+function logElementHit(label, base, final, element) {
+  const elemTxt = element ? ` (${element})` : "";
+  if (final === base) log(`${label}: ${final} Schaden${elemTxt}.`);
+  else log(`${label}: ${base}→${final} Schaden${elemTxt}.`);
+}
+
 // ==============================
-// Ziehen / Mischen / Rotieren
+// Deck ziehen / mischen
 // ==============================
 
 const shuffle = (a) => {
@@ -266,33 +242,6 @@ export function returnToDeck(inst) {
 }
 
 // ==============================
-// Hand neu ziehen (Redraw)
-// ==============================
-
-export function redrawHand() {
-  const s = GameState;
-  const prevCount = s.hand.length;
-
-  if (prevCount === 0) return { ok: false, log: "Keine Karten in der Hand zum Neu-Mischen." };
-  if (s.energy <= 0) return { ok: false, log: "Nicht genug Energie (benötigt 1)." };
-
-  s.deck.push(...s.hand);
-  s.hand = [];
-  s.deck = shuffle(s.deck);
-  s.energy -= 1;
-
-  let drawn = 0;
-  for (let i = 0; i < prevCount; i++) {
-    if (!s.deck.length) break;
-    s.hand.push(s.deck.pop());
-    drawn++;
-  }
-
-  log(`<span class="small muted">Hand neu gemischt: ${drawn} Karten, Energie jetzt ${s.energy}.</span>`);
-  return { ok: true };
-}
-
-// ==============================
 // Opferung & Level-Up
 // ==============================
 
@@ -307,33 +256,59 @@ export function sacrificeByUid(cardUid) {
   return { ok: true };
 }
 
-export function levelUp(cardUid, delta = 1) {
-  const all = [GameState.hand, GameState.deck, GameState.discard];
-  for (const arr of all) {
-    const c = arr.find((x) => x.uid === cardUid);
-    if (c) {
-      c.level = Math.max(1, (c.level || 1) + delta);
-      return { ok: true, level: c.level };
-    }
+// Passiv darf geopfert werden, aber NICHT gelevelt werden.
+export function sacrifice(fromCardUid, toCardUid) {
+  sacrificeByUid(fromCardUid);
+
+  const findByUid = (id) =>
+    GameState.hand.find((c) => c.uid === id) ||
+    GameState.deck.find((c) => c.uid === id) ||
+    GameState.discard.find((c) => c.uid === id);
+
+  const target = findByUid(toCardUid);
+  if (!target) return { ok: false };
+
+  const t = tplById(target.tplId);
+
+  // Passiv nie leveln
+  if (t.type === "passiv") {
+    log(`<span class="small muted">Passiv-Karten können nicht gelevelt werden.</span>`);
+    return { ok: true };
   }
-  return { ok: false };
+
+  // ✅ Nur Fallen dürfen durch Opferung stärker werden
+  const isTrap = (t.type === "falle" || t.type === "s_falle");
+  if (!isTrap) {
+    log(`<span class="small muted">Nur <b>Fallen</b> können durch Opferung gelevelt werden.</span>`);
+    return { ok: true };
+  }
+
+
+  const pass = computePassiveBonuses();
+  const bonus = Math.max(0, pass.sacrificeLevelBonus || 0);
+
+  target.level = (target.level || 1) + 1 + bonus;
+  log(`<span class="k">Level-Up</span>: uid=${toCardUid} → L${target.level}`);
+  return { ok: true };
 }
 
 // ==============================
-// Chance / Reveal / Actions
+// Chance helpers
 // ==============================
 
 function clampChance(x, min = 5, max = 95) {
   return Math.max(min, Math.min(max, Math.round(x)));
 }
-
 function rollChancePct(pct) {
   return Math.random() * 100 < pct;
 }
-
 function clampPct01(x) {
   return Math.max(0, Math.min(100, Math.round(x)));
 }
+
+// ==============================
+// Reveal (Traits)
+// ==============================
 
 function revealRandomHeroTraits(n = 1) {
   const h = GameState.hero;
@@ -344,10 +319,8 @@ function revealRandomHeroTraits(n = 1) {
   const pool = [
     { key: "strongElement", label: "Starkes Element", value: () => h.strongElement },
     { key: "weakElement", label: "Schwaches Element", value: () => h.weakElement },
-    { key: "ability", label: "Spezialfähigkeit", value: () => h.abilityName || h.passives?.[0]?.id || "???" },
+    { key: "ability", label: "Spezialfähigkeit", value: () => h.abilityName || h.abilityId || "???" },
     { key: "maxHp", label: "MaxHP", value: () => h.maxHp },
-    { key: "speed", label: "Speed", value: () => h.speed || h.baseSpeed || 1 },
-    { key: "level", label: "Level", value: () => h.level ?? (GameState.round ?? 1) },
   ];
 
   const hidden = pool.filter((t) => !h.revealed[t.key]);
@@ -366,70 +339,212 @@ function revealRandomHeroTraits(n = 1) {
   }
 }
 
-export function revealTraits(n=1){ revealRandomHeroTraits(n); }
+export function revealTraits(n = 1) {
+  revealRandomHeroTraits(n);
+}
 
-/**
- * Supported action kinds:
- * - gain_souls   { amount }
- * - lose_souls   { amount }
- * - damage_flat  { amount, element? }
- * - damage_pct   { pct, element? }   // % von MaxHP
- * - heal_pct     { pct }
- * - freeze_days  { days }
- * - reveal_trait { count }
- */
-function applyActions(actions) {
+// ==============================
+// Actions aus chance_event outcomes (DEINE JSON)
+// ==============================
+
+const ELEMENTS = ["feuer", "eis", "blut", "schatten", "natur", "licht"];
+
+function pickDistinctElements(count = 3) {
+  const pool = [...ELEMENTS];
+  const out = [];
+  while (pool.length && out.length < count) {
+    const i = Math.floor(Math.random() * pool.length);
+    out.push(pool.splice(i, 1)[0]);
+  }
+  return out;
+}
+
+// meta: { node } damit ruin_village/dungeon das aktuelle Feld ändern kann
+function applyActions(actions, meta = {}) {
   const h = GameState.hero;
   if (!h) return;
+
+  GameState.mods = GameState.mods || {};
+  h.status = h.status || {};
+  h.dots = Array.isArray(h.dots) ? h.dots : [];
 
   for (const a of actions || []) {
     if (!a?.kind) continue;
 
-
-    if (a.kind === "gain_souls") {
-      const amt = Math.max(0, Math.round(a.amount ?? 0));
-      GameState.souls += amt;
-      log(`<span class="soul">+${amt} Seelen</span>`);
-    } else if (a.kind === "lose_souls") {
-      const amt = Math.max(0, Math.round(a.amount ?? 0));
-      GameState.souls = Math.max(0, (GameState.souls || 0) - amt);
-      log(`<span class="small muted">-${amt} Seelen</span>`);
-    } else if (a.kind === "damage_flat") {
-      const amt = Math.max(0, Math.round(a.amount ?? 0));
-      const element = a.element ?? null;
-      const final = computeElementalDamage(amt, element);
-      h.hp = clamp(h.hp - final, 0, h.maxHp);
-      logElementHit(`<b>Event</b> Schaden`, amt, final, element);
-    } else if (a.kind === "damage_pct") {
-      const pct = clampPct01(a.pct ?? 0);
-      const raw = Math.max(0, Math.round(h.maxHp * (pct / 100)));
-      const element = a.element ?? null;
-      const final = computeElementalDamage(raw, element);
-      h.hp = clamp(h.hp - final, 0, h.maxHp);
-      logElementHit(`<b>Event</b> ${pct}% Schaden`, raw, final, element);
-    } else if (a.kind === "heal_pct") {
-      const pct = clampPct01(a.pct ?? 0);
-      const heal = Math.max(0, Math.round(h.maxHp * (pct / 100)));
-      h.hp = clamp(h.hp + heal, 0, h.maxHp);
-      log(`<span class="small">Heilung: +${heal} HP</span>`);
-    } else if (a.kind === "freeze_days") {
-      const days = Math.max(1, Math.round(a.days ?? 1));
-      h.status = h.status || {};
-      h.status.frozenDays = (h.status.frozenDays || 0) + days;
-      log(`<span class="small">❄️ Eingefroren: ${days} Tag(e)</span>`);
-    } else if (a.kind === "reveal_trait") {
+    // --- Reveal / False info ---
+    if (a.kind === "reveal") {
       const count = Math.max(1, Math.round(a.count ?? 1));
       revealRandomHeroTraits(count);
-    } else {
-      log(`<span class="small muted">Unbekannte Action: ${a.kind}</span>`);
+      continue;
     }
+    if (a.kind === "false_info") {
+      // zeigt absichtlich falsche Info (nur Text, keine echten revealed flags)
+      const fake = [
+        `👁️ Aufgedeckt: <b>Starkes Element</b> → ${ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)]}`,
+        `👁️ Aufgedeckt: <b>Schwaches Element</b> → ${ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)]}`,
+        `👁️ Aufgedeckt: <b>MaxHP</b> → ${Math.floor((h.maxHp || 1) * (0.6 + Math.random() * 0.8))}`,
+      ];
+      log(`<span class="small muted">${fake[Math.floor(Math.random() * fake.length)]} <i>(falsch)</i></span>`);
+      continue;
+    }
+
+    // --- Map/Tile Änderungen ---
+    if (a.kind === "ruin_village") {
+      if (meta.node && (meta.node.kind === "village" || meta.node.kind === "visited_village")) {
+        meta.node.kind = "ruined_village";
+        log(`<span class="small">🏚️ Dorf zerstört.</span>`);
+      }
+      continue;
+    }
+    if (a.kind === "ruin_dungeon") {
+      if (meta.node && (meta.node.kind === "dungeon" || meta.node.kind === "cleared_dungeon")) {
+        meta.node.kind = "ruined_dungeon";
+        log(`<span class="small">🕳️ Dungeon zerstört.</span>`);
+      }
+      continue;
+    }
+
+    // --- Souls / Shop penalty ---
+    if (a.kind === "gain_souls") {
+      const amt = Math.max(0, Math.round(a.amount ?? 0));
+      GameState.souls = (GameState.souls || 0) + amt;
+      log(`<span class="soul">+${amt} Seelen</span>`);
+      continue;
+    }
+    if (a.kind === "shop_penalty") {
+      const amt = Math.max(0, Math.round(a.amount ?? 0));
+      GameState.mods.shopPenalty = (GameState.mods.shopPenalty || 0) + amt;
+      log(`<span class="small muted">Shop: nächster Einkauf +${amt}.</span>`);
+      continue;
+    }
+
+    // --- Schaden/Heal ---
+    if (a.kind === "damage_flat") {
+      const amt = Math.max(0, Math.round(a.amount ?? 0));
+      const element = a.element ?? null;
+      const final = computeFinalDamage(amt, element, null);
+      const dealt = applyDamage(h, final, { type: "direct", element, source: "event" });
+      logElementHit(`<b>Event</b> Schaden`, final, dealt, element);
+      continue;
+    }
+
+    if (a.kind === "damage_pct") {
+      const pct = clampPct01(a.pct ?? 0);
+      const element = a.element ?? null;
+      const base = Math.max(0, Math.round((h.maxHp || 0) * (pct / 100)));
+      const final = computeFinalDamage(base, element, null);
+      const dealt = applyDamage(h, final, { type: "direct", element, source: "event" });
+      logElementHit(`<b>Event</b> ${pct}% Schaden`, final, dealt, element);
+      continue;
+    }
+
+    if (a.kind === "heal_pct") {
+      const pct = clampPct01(a.pct ?? 0);
+      const heal = Math.max(0, Math.round((h.maxHp || 0) * (pct / 100)));
+      const real = applyHeal(h, heal);
+      log(`<span class="small">Heilung: +${real} HP</span>`);
+      continue;
+    }
+
+    // --- Freeze ---
+    if (a.kind === "freeze_days") {
+      const days = Math.max(1, Math.round(a.days ?? 1));
+      h.status.frozenDays = (h.status.frozenDays || 0) + days;
+      log(`<span class="small">❄️ Eingefroren: ${days} Tag(e)</span>`);
+      continue;
+    }
+
+    // --- Resist / Vuln (zeitlich) ---
+    if (a.kind === "hero_resist_days") {
+      const pct = Math.max(0, Math.round(a.pct ?? 0));
+      const days = Math.max(1, Math.round(a.days ?? 1));
+      h.status.resist = { pct, daysLeft: days };
+      log(`<span class="small">🛡️ Resist: ${pct}% für ${days} Tag(e)</span>`);
+      continue;
+    }
+    if (a.kind === "hero_vuln_days") {
+      const pct = Math.max(0, Math.round(a.pct ?? 0));
+      const days = Math.max(1, Math.round(a.days ?? 1));
+      h.status.vuln = { pct, daysLeft: days };
+      log(`<span class="small">💥 Verwundbar: +${pct}% für ${days} Tag(e)</span>`);
+      continue;
+    }
+
+    // --- Immunity action ---
+    if (a.kind === "immune_to_strong") {
+      const els = pickDistinctElements(3);
+      h.status.immuneElements = Array.isArray(h.status.immuneElements) ? h.status.immuneElements : [];
+      for (const el of els) if (!h.status.immuneElements.includes(el)) h.status.immuneElements.push(el);
+      log(`<span class="small">🧿 Immun gegen: ${els.join(", ")}</span>`);
+      continue;
+    }
+
+    // --- MaxHP % change ---
+    if (a.kind === "maxhp_pct") {
+      const pct = Math.round(a.pct ?? 0); // kann negativ sein
+      const delta = Math.round((h.maxHp || 0) * (pct / 100));
+      h.maxHp = Math.max(1, (h.maxHp || 1) + delta);
+      h.hp = clamp(h.hp, 0, h.maxHp);
+      log(`<span class="small">❤️ MaxHP ${pct}% (${delta >= 0 ? "+" : ""}${delta})</span>`);
+      continue;
+    }
+
+    // --- Items / Block items ---
+    if (a.kind === "item_shield") {
+      const stacks = Math.max(1, Math.round(a.stacks ?? 1));
+      h.status.itemShieldStacks = (h.status.itemShieldStacks || 0) + stacks;
+      log(`<span class="small">🛡️ Item: Schild x${stacks}</span>`);
+      continue;
+    }
+    if (a.kind === "block_items") {
+      const days = Math.max(1, Math.round(a.days ?? 1));
+      h.status.blockItemsDays = Math.max(h.status.blockItemsDays || 0, days);
+      log(`<span class="small muted">🎒 Items blockiert: ${days} Tag(e)</span>`);
+      continue;
+    }
+
+    // --- DoT actions ---
+    if (a.kind === "dot_clear") {
+      const removed = h.dots.length;
+      h.dots = [];
+      log(`<span class="small">🩸 DoT entfernt (${removed})</span>`);
+      continue;
+    }
+    if (a.kind === "dot_burst") {
+      // "DoT sofort": einmalig sofort den aktuellen DoT-Schaden anwenden (ohne Tage zu reduzieren)
+      let sum = 0;
+      for (const d of h.dots) {
+        const base = Math.max(0, Math.round(d.dmg || 0));
+        const element = d.element ?? null;
+        const final = computeFinalDamage(base, element, null);
+        const dealt = applyDamage(h, final, { type: "dot", element, source: "dot_burst" });
+        sum += dealt;
+      }
+      log(`<span class="small">🩸 DoT sofort: ${sum} Schaden</span>`);
+      continue;
+    }
+
+    // --- Trap modifiers ---
+    if (a.kind === "drunk_next_trap") {
+      const mult = Math.max(2, Math.round(a.mult ?? 2));
+      h.status.nextTrapMult = mult;
+      log(`<span class="small">🍺 Betrunken: nächste Falle x${mult}</span>`);
+      continue;
+    }
+
+    // --- nothing ---
+    if (a.kind === "nothing") {
+      log(`<span class="small muted">… nichts passiert.</span>`);
+      continue;
+    }
+
+    log(`<span class="small muted">Unbekannte Action: ${a.kind}</span>`);
   }
 }
 
 // ==============================
 // Karte spielen / platzieren
 // ==============================
-// Regel: alle Karten müssen auf ein Feld gespielt werden.
 
 export function playCard(inst, targetNodeId) {
   const t = tplById(inst.tplId);
@@ -438,13 +553,11 @@ export function playCard(inst, targetNodeId) {
   if (GameState.energy < cost) return { ok: false, log: `Nicht genug Energie (${cost} nötig).` };
   if (!targetNodeId) return { ok: false, log: "Diese Karte muss auf ein Feld gespielt werden." };
 
-  // Platzierung prüfen (Dorf/Dungeon nur 1 Karte)
   const placed = placeOnNode(inst, targetNodeId);
   if (!placed.ok) return { ok: false, log: placed.log };
 
   GameState.energy -= cost;
 
-  // Hand entfernen + zurück ins Deck
   GameState.hand = GameState.hand.filter((c) => c.uid !== inst.uid);
   returnToDeck(inst);
 
@@ -493,6 +606,8 @@ export function triggerNode(nodeId) {
   h.dots = Array.isArray(h.dots) ? h.dots : [];
   h.status = h.status || {};
 
+  const node = GameState.map?.nodes?.find((n) => n.id === nodeId) || null;
+
   const keep = [];
 
   for (const p of entries) {
@@ -502,23 +617,29 @@ export function triggerNode(nodeId) {
     if (t.type === "dorf" || t.type === "dungeon") {
       const heroLvl = GameState.hero?.level ?? (GameState.round ?? 1);
       const cardLvl = p.level ?? 1;
-      const pct = clampChance(50 + (cardLvl - heroLvl) * 10);
+      let pct = clampChance(50 + (cardLvl - heroLvl) * 10);
+
+      // (9) Helm der Wachsamkeit: Held gewinnt häufiger -> Player-Chance -15%
+      if (heroHasItem(GameState.hero, "item_alert_helm")) {
+        pct = clampChance(pct - 15);
+      }
 
       if (t.effect?.kind !== "chance_event") {
         log(`<span class="small muted">${t.name}: (keine chance_event Definition)</span>`);
       } else {
+        // Falls Held "cautious" ist, könntest du hier forced-fail einbauen.
         const playerWins = rollChancePct(pct);
         const outcome = playerWins ? t.effect.playerWin : t.effect.heroWin;
 
-        const label = playerWins ? "Du gewinnst" : "Held gewinnt";
-        const rollTxt = `Chance ${pct}% • Karte L${cardLvl} vs Held L${heroLvl}`;
-
-        log(`<b>${t.name}</b> – ${label} <span class="small muted">(${rollTxt})</span>`);
+        log(
+          `<b>${t.name}</b> – ${playerWins ? "Du gewinnst" : "Held gewinnt"} ` +
+          `<span class="small muted">(Chance ${pct}%)</span>`
+        );
         if (outcome?.text) log(`<span class="small">${outcome.text}</span>`);
-        applyActions(outcome?.actions || []);
-        onChanceEventResolved({
-        winner: playerWins ? "player" : "hero"
-        });
+
+        applyActions(outcome?.actions || [], { node, nodeId, tpl: t });
+
+        onChanceEventResolved?.({ winner: playerWins ? "player" : "hero" });
       }
 
       if (!p.once) keep.push(p);
@@ -528,35 +649,34 @@ export function triggerNode(nodeId) {
     // ---- Fallen / Zonen ----
     const v = { tplId: p.tplId, level: p.level };
     const kind = t.effect?.kind;
-
     const baseVal = Math.max(1, Math.floor(scaledValue(v)));
     const element = (t.elements && t.elements[0]) || null;
 
+    const pass = computePassiveBonuses();
     const hstatus = h.status || (h.status = {});
     const mult = Math.max(1, hstatus.nextTrapMult || 1);
     const bonusPct = Math.max(0, hstatus.nextTrapBonusPct || 0);
 
-    // helper: einmalig buff verbrauchen
     const consumeTrapBuff = () => {
       hstatus.nextTrapMult = 1;
       hstatus.nextTrapBonusPct = 0;
     };
 
     const applyTrapDamageOnce = (rawBase) => {
-      // trap_buff Bonus (einmalig) auf die nächste Falle anwenden
       let raw = rawBase;
       if (bonusPct > 0) raw = Math.round(raw * (1 + bonusPct / 100));
 
       const final = computeFinalDamage(raw, element, v);
-      h.hp = clamp(h.hp - final, 0, h.maxHp);
-      logElementHit(`<b>Falle</b> ${t.name}`, raw, final, element);
-      return final;
+      const dealt = applyDamage(h, final, { type: "direct", element, source: t.id });
+
+      logElementHit(`<b>Falle</b> ${t.name}`, final, dealt, element);
+      return dealt;
     };
 
     const applyTrapDotOnce = (rawBase, days) => {
-      // passive dot bonuses
-      const pass = computePassiveBonuses();
       let dmg = rawBase;
+
+      // passive dot bonuses
       if (pass.dotPct) dmg = Math.round(dmg * (1 + pass.dotPct / 100));
       const dDays = Math.max(1, days + (pass.dotDaysBonus || 0));
 
@@ -568,88 +688,52 @@ export function triggerNode(nodeId) {
     };
 
     if (kind === "trap_buff") {
-      // verstärkt nächste Falle
       const pct = Math.max(0, Math.round(scaledValue(v)));
       hstatus.nextTrapBonusPct = (hstatus.nextTrapBonusPct || 0) + pct;
       log(`<span class="small">🜏 ${t.name}: nächste Falle +${pct}%</span>`);
+      if (!p.once) keep.push(p);
       continue;
     }
 
-    // alles andere: ggf. mehrfach auslösen ("betrunken")
     for (let i = 0; i < mult; i++) {
       if (kind === "damage" || kind === "aoe_damage") {
         applyTrapDamageOnce(baseVal);
-      }
-
-      else if (kind === "multi_hit") {
+      } else if (kind === "multi_hit") {
         const hits = Math.max(1, Math.round(t.effect?.hits ?? 2));
         for (let k = 0; k < hits; k++) applyTrapDamageOnce(baseVal);
-      }
-
-      else if (kind === "dot" || kind === "bleed") {
+      } else if (kind === "dot" || kind === "bleed") {
         const days = Math.max(1, Math.round(t.effect?.days ?? 2));
         applyTrapDotOnce(baseVal, days);
-      }
-
-      else if (kind === "delayed_blast") {
+      } else if (kind === "delayed_blast") {
         const delay = Math.max(1, Math.round(t.effect?.delayDays ?? 1));
         hstatus.delayed = Array.isArray(hstatus.delayed) ? hstatus.delayed : [];
         hstatus.delayed.push({ dmg: baseVal, daysLeft: delay, element });
         log(`<span class="small">⏳ ${t.name}: Explosion in ${delay} Tag(en)</span>`);
-      }
-
-      else if (kind === "damage_plus_souls") {
-        // damage + souls
+      } else if (kind === "damage_plus_souls") {
         const soulsBase = Math.max(0, Math.round(t.effect?.soulsBase ?? 0));
         const soulsGrowth = Math.max(0, Number(t.effect?.soulsGrowth ?? 0));
         const souls = Math.max(0, Math.round(soulsBase + (v.level - 1) * soulsGrowth));
 
         applyTrapDamageOnce(baseVal);
 
-        const pass = computePassiveBonuses();
         const gained = Math.round(souls * (1 + pass.soulsGainPct / 100));
         GameState.souls += gained;
         log(`<span class="soul">+${gained} Seelen</span>`);
-      }
-
-      else if (kind === "kill_bonus_souls") {
-        // gibt Souls nur, wenn Held durch diesen Trigger stirbt
+      } else if (kind === "kill_bonus_souls") {
         const before = h.hp;
         applyTrapDamageOnce(baseVal);
         if (before > 0 && h.hp <= 0) {
           const souls = Math.max(0, Math.round(t.effect?.base ?? 0));
-          const pass = computePassiveBonuses();
           const gained = Math.round(souls * (1 + pass.soulsGainPct / 100));
           GameState.souls += gained;
           log(`<span class="soul">☠️ Tod-Bonus: +${gained} Seelen</span>`);
         }
-      }
-
-      else {
+      } else {
         log(`<span class="small muted">${t.name}: Effekt-kind "${kind}" ist nicht implementiert.</span>`);
       }
     }
 
-    // einmalige Buffs nach dem Trap-Trigger verbrauchen
     consumeTrapBuff();
-
-
-    if (kind === "damage" || kind === "aoe_damage") {
-      const element = (t.elements && t.elements[0]) || null;
-      const final = computeElementalDamage(base, element, v);
-      h.hp = clamp(h.hp - final, 0, h.maxHp);
-      logElementHit(`<b>Falle</b> ${t.name}`, base, final, element);
-    } else if (kind === "dot" || kind === "bleed") {
-      const element = (t.elements && t.elements[0]) || null;
-      h.dots.push({ dmg: base, days: 3, element });
-      log(`<b>Zone</b> ${t.name} – DoT ${base} für 3T${element ? ` (${element})` : ""}.`);
-    } else if (kind === "gain_souls") {
-      const n = Math.max(0, Math.round(base));
-      GameState.souls += n;
-      log(`<span class="soul">+${n} Seelen</span>`);
-    } else {
-      log(`<span class="small muted">${t.name}: Effekt-kind "${kind}" ist nicht implementiert.</span>`);
-    }
 
     if (!p.once) keep.push(p);
   }
@@ -659,7 +743,7 @@ export function triggerNode(nodeId) {
 }
 
 // ==============================
-// Optional: Validator (Debug)
+// Optional: Validator
 // ==============================
 
 export function validateCardLibrary() {
@@ -697,24 +781,3 @@ export function validateCardLibrary() {
 
   return issues;
 }
-
-export function sacrifice(fromCardUid, toCardUid) {
-  sacrificeByUid(fromCardUid);
-
-  const findByUid = (id) =>
-    GameState.hand.find((c) => c.uid === id) ||
-    GameState.deck.find((c) => c.uid === id) ||
-    GameState.discard.find((c) => c.uid === id);
-
-  const target = findByUid(toCardUid);
-  if (!target) return { ok: false };
-
-  const pass = computePassiveBonuses();
-  const bonus = Math.max(0, pass.sacrificeLevelBonus || 0);
-
-  target.level = (target.level || 1) + 1 + bonus;
-
-  log(`<span class="k">Level-Up</span>: uid=${toCardUid} → L${target.level}`);
-  return { ok: true };
-}
-
