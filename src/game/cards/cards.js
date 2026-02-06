@@ -6,9 +6,9 @@
 // - triggerNode führt Fallen + chance_event aus
 // ============================================================================
 
-import { GameState, uid, clamp } from "../core/gameState.js";
-import { onChanceEventResolved } from "../effects/effects.js";
-import { applyDamage, applyHeal, heroHasItem } from "../hero/hero.js";
+import { GameState, uid, clamp, HAND_LIMIT } from "../core/gameState.js";
+import { onChanceEventResolved, applyEffect } from "../effects/effects.js";
+import { applyDamage, applyHeal, heroHasItem, giveHeroRandomItem } from "../hero/hero.js";
 
 // ==============================
 // Element-Faktor (weak/resist/immune)
@@ -225,7 +225,7 @@ const shuffle = (a) => {
 export function drawCards(n) {
   let drawn = 0;
   for (let i = 0; i < n; i++) {
-    if (GameState.hand.length >= 20) break;
+    if (GameState.hand.length >= HAND_LIMIT) break;
     if (GameState.deck.length === 0) break;
     const inst = GameState.deck.pop();
     GameState.hand.push(inst);
@@ -269,20 +269,10 @@ export function sacrifice(fromCardUid, toCardUid) {
   if (!target) return { ok: false };
 
   const t = tplById(target.tplId);
-
-  // Passiv nie leveln
   if (t.type === "passiv") {
     log(`<span class="small muted">Passiv-Karten können nicht gelevelt werden.</span>`);
     return { ok: true };
   }
-
-  // ✅ Nur Fallen dürfen durch Opferung stärker werden
-  const isTrap = (t.type === "falle" || t.type === "s_falle");
-  if (!isTrap) {
-    log(`<span class="small muted">Nur <b>Fallen</b> können durch Opferung gelevelt werden.</span>`);
-    return { ok: true };
-  }
-
 
   const pass = computePassiveBonuses();
   const bonus = Math.max(0, pass.sacrificeLevelBonus || 0);
@@ -359,7 +349,7 @@ function pickDistinctElements(count = 3) {
   return out;
 }
 
-// meta: { node } damit ruin_village/dungeon das aktuelle Feld ändern kann
+// meta: { node } damit ruin_village/ruin_dungeon das aktuelle Feld ändern kann
 function applyActions(actions, meta = {}) {
   const h = GameState.hero;
   if (!h) return;
@@ -377,6 +367,7 @@ function applyActions(actions, meta = {}) {
       revealRandomHeroTraits(count);
       continue;
     }
+
     if (a.kind === "false_info") {
       // zeigt absichtlich falsche Info (nur Text, keine echten revealed flags)
       const fake = [
@@ -384,7 +375,34 @@ function applyActions(actions, meta = {}) {
         `👁️ Aufgedeckt: <b>Schwaches Element</b> → ${ELEMENTS[Math.floor(Math.random() * ELEMENTS.length)]}`,
         `👁️ Aufgedeckt: <b>MaxHP</b> → ${Math.floor((h.maxHp || 1) * (0.6 + Math.random() * 0.8))}`,
       ];
-      log(`<span class="small muted">${fake[Math.floor(Math.random() * fake.length)]} <i>(falsch)</i></span>`);
+      log(
+        `<span class="small muted">${fake[Math.floor(Math.random() * fake.length)]} <i>(falsch)</i></span>`
+      );
+      continue;
+    }
+
+    // ✅ NEW: Effekte aus effects.de.json anwenden
+    // action: { kind:"apply_effect", id:"gift", stacks?:1, days?:3 }
+    if (a.kind === "apply_effect") {
+      const id = a.id;
+      const stacks = Math.max(1, Math.round(a.stacks ?? 1));
+      const days = a.days != null ? Math.max(1, Math.round(a.days)) : null;
+
+      if (!id) {
+        log(`<span class="small muted">⚠️ apply_effect: fehlende id</span>`);
+        continue;
+      }
+
+      const ok = applyEffect?.(id, { stacks, days });
+      if (ok) {
+        log(
+          `<span class="small">✨ Effekt: <b>${id}</b>${stacks > 1 ? ` ×${stacks}` : ""}${
+            days != null ? ` (${days}T)` : ""
+          }</span>`
+        );
+      } else {
+        log(`<span class="small muted">⚠️ Effekt nicht gefunden: ${id}</span>`);
+      }
       continue;
     }
 
@@ -396,6 +414,7 @@ function applyActions(actions, meta = {}) {
       }
       continue;
     }
+
     if (a.kind === "ruin_dungeon") {
       if (meta.node && (meta.node.kind === "dungeon" || meta.node.kind === "cleared_dungeon")) {
         meta.node.kind = "ruined_dungeon";
@@ -411,6 +430,7 @@ function applyActions(actions, meta = {}) {
       log(`<span class="soul">+${amt} Seelen</span>`);
       continue;
     }
+
     if (a.kind === "shop_penalty") {
       const amt = Math.max(0, Math.round(a.amount ?? 0));
       GameState.mods.shopPenalty = (GameState.mods.shopPenalty || 0) + amt;
@@ -455,6 +475,8 @@ function applyActions(actions, meta = {}) {
     }
 
     // --- Resist / Vuln (zeitlich) ---
+    // (wenn du das künftig NUR über apply_effect machen willst,
+    // kannst du diese beiden Cases später löschen)
     if (a.kind === "hero_resist_days") {
       const pct = Math.max(0, Math.round(a.pct ?? 0));
       const days = Math.max(1, Math.round(a.days ?? 1));
@@ -462,6 +484,7 @@ function applyActions(actions, meta = {}) {
       log(`<span class="small">🛡️ Resist: ${pct}% für ${days} Tag(e)</span>`);
       continue;
     }
+
     if (a.kind === "hero_vuln_days") {
       const pct = Math.max(0, Math.round(a.pct ?? 0));
       const days = Math.max(1, Math.round(a.days ?? 1));
@@ -480,6 +503,8 @@ function applyActions(actions, meta = {}) {
     }
 
     // --- MaxHP % change ---
+    // (wenn du das künftig NUR über apply_effect machen willst,
+    // kannst du maxhp_pct später löschen)
     if (a.kind === "maxhp_pct") {
       const pct = Math.round(a.pct ?? 0); // kann negativ sein
       const delta = Math.round((h.maxHp || 0) * (pct / 100));
@@ -490,12 +515,28 @@ function applyActions(actions, meta = {}) {
     }
 
     // --- Items / Block items ---
+    // ✅ item_shield = gib RANDOM item(s)
     if (a.kind === "item_shield") {
       const stacks = Math.max(1, Math.round(a.stacks ?? 1));
-      h.status.itemShieldStacks = (h.status.itemShieldStacks || 0) + stacks;
-      log(`<span class="small">🛡️ Item: Schild x${stacks}</span>`);
+
+      // blockItems respected
+      if ((h.status.blockItemsDays || 0) > 0) {
+        log(`<span class="small muted">🎒 Items blockiert: ${h.status.blockItemsDays} Tag(e)</span>`);
+        continue;
+      }
+
+      // richtig: random item(s) aus items.de.json
+      if (typeof giveHeroRandomItem === "function") {
+        giveHeroRandomItem(h, stacks);
+      } else if (typeof window.__giveHeroRandomItem === "function") {
+        // fallback falls du es noch irgendwo hast
+        for (let i = 0; i < stacks; i++) window.__giveHeroRandomItem();
+      } else {
+        log(`<span class="small muted">[Item-System fehlt: random item ×${stacks}]</span>`);
+      }
       continue;
     }
+
     if (a.kind === "block_items") {
       const days = Math.max(1, Math.round(a.days ?? 1));
       h.status.blockItemsDays = Math.max(h.status.blockItemsDays || 0, days);
@@ -510,6 +551,7 @@ function applyActions(actions, meta = {}) {
       log(`<span class="small">🩸 DoT entfernt (${removed})</span>`);
       continue;
     }
+
     if (a.kind === "dot_burst") {
       // "DoT sofort": einmalig sofort den aktuellen DoT-Schaden anwenden (ohne Tage zu reduzieren)
       let sum = 0;
@@ -532,6 +574,14 @@ function applyActions(actions, meta = {}) {
       continue;
     }
 
+    // --- next sacrifice bonus ---
+    if (a.kind === "next_sacrifice_bonus") {
+      const levels = Math.max(1, Math.round(a.levels ?? 1));
+      GameState.mods.nextHandLevelBonus = (GameState.mods.nextHandLevelBonus || 0) + levels;
+      log(`<span class="small">🩸 Nächste Runde: Hand +${levels} Level</span>`);
+      continue;
+    }
+
     // --- nothing ---
     if (a.kind === "nothing") {
       log(`<span class="small muted">… nichts passiert.</span>`);
@@ -541,6 +591,7 @@ function applyActions(actions, meta = {}) {
     log(`<span class="small muted">Unbekannte Action: ${a.kind}</span>`);
   }
 }
+
 
 // ==============================
 // Karte spielen / platzieren
@@ -667,7 +718,15 @@ export function triggerNode(nodeId) {
       if (bonusPct > 0) raw = Math.round(raw * (1 + bonusPct / 100));
 
       const final = computeFinalDamage(raw, element, v);
-      const dealt = applyDamage(h, final, { type: "direct", element, source: t.id });
+      const isAoE = (kind === "aoe_damage");
+      const dealt = applyDamage(h, final, {
+      type: "direct",
+      isAoE,
+      element,
+      source: t.id,
+      day: GameState.day
+      });
+
 
       logElementHit(`<b>Falle</b> ${t.name}`, final, dealt, element);
       return dealt;

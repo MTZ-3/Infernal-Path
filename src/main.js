@@ -19,6 +19,11 @@ function shuffle(a) {
   return a;
 }
 
+function pickRandom(list) {
+  if (!Array.isArray(list) || !list.length) return null;
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 async function loadJSON(path, fallback) {
   try {
     const r = await fetch(path, { cache: "no-store" });
@@ -47,21 +52,17 @@ window.__cheatToggleRevealAll = () => {
   h.revealed = h.revealed || {};
   h._revealSnapshot = h._revealSnapshot || {};
 
-  // wenn gerade NICHT all-reveal aktiv ist -> snapshot speichern und alles zeigen
   if (!h._revealAll) {
-    // snapshot: nur echte revealed speichern
     h._revealSnapshot = { ...h.revealed };
 
-    // Alles sichtbar (aber nur die Keys, die es bei dir gibt!)
     h.revealed.strongElement = true;
-    h.revealed.weakElement   = true;
-    h.revealed.ability       = true;
-    h.revealed.maxHp         = true;
+    h.revealed.weakElement = true;
+    h.revealed.ability = true;
+    h.revealed.maxHp = true;
 
     h._revealAll = true;
     window.__log?.(`<span class="small muted">👁 Cheat: Alle Heldendaten sichtbar.</span>`);
   } else {
-    // zurück auf snapshot: nur das sichtbar lassen, was wirklich schon aufgedeckt wurde
     h.revealed = { ...h._revealSnapshot };
     h._revealAll = false;
     window.__log?.(`<span class="small muted">👁 Cheat: Zurück auf echte Aufdeckungen.</span>`);
@@ -80,8 +81,8 @@ bindEffectLogger(window.__log);
 const cards = await loadJSON("./data/cards.de.json", []);
 setCardLibrary(cards);
 
-const ACTIVE_CARDS  = cards.filter(c => c.type !== "passiv");
-const PASSIVE_CARDS = cards.filter(c => c.type === "passiv");
+const ACTIVE_CARDS = cards.filter((c) => c.type !== "passiv");
+const PASSIVE_CARDS = cards.filter((c) => c.type === "passiv");
 
 // heroes.de.json kann sein:
 // - { names, abilities, baseHeroes }
@@ -92,9 +93,9 @@ const heroData = Array.isArray(heroRaw)
   ? { names: [], abilities: [], baseHeroes: heroRaw }
   : (heroRaw || { names: [], abilities: [], baseHeroes: [] });
 
-window.__HERO_NAMES     = heroData.names || [];
+window.__HERO_NAMES = heroData.names || [];
 window.__HERO_ABILITIES = heroData.abilities || [];
-window.__BASE_HEROES    = heroData.baseHeroes || [];
+window.__BASE_HEROES = heroData.baseHeroes || [];
 
 // ------------------------------------------------------------
 // Map mount
@@ -109,115 +110,19 @@ window.__portalDaily = (drawCount) => {
 };
 
 // ------------------------------------------------------------
-// Hero spawning (robust + cheat-friendly)
+// Hero spawning (EINMAL sauber definiert)
 // ------------------------------------------------------------
-function pickRandom(list) {
-  if (!Array.isArray(list) || !list.length) return null;
-  return list[Math.floor(Math.random() * list.length)];
-}
-
-function applyHeroNameAndAbility(hero, forcedAbilityId = null) {
-  // Name (zufällig, NICHT rotieren)
-  const name = pickRandom(window.__HERO_NAMES);
-  if (name) hero.name = name;
-
-  // Ability
-  const abilities = window.__HERO_ABILITIES || [];
-  let abil = null;
-
-  if (forcedAbilityId) {
-    abil = abilities.find(a => a.id === forcedAbilityId) || null;
-  } else {
-    abil = pickRandom(abilities);
-  }
-
-  if (abil) {
-    hero.abilityId   = abil.id;
-    hero.abilityName = abil.name;
-    hero.abilityDesc = abil.desc;
-  } else {
-    hero.abilityId = null;
-    hero.abilityName = null;
-    hero.abilityDesc = null;
-  }
-}
-
-function placeHeroAtStart() {
-  const startNode =
-    GameState.map?.nodes?.find(n => n.layer === 0)?.id ??
-    GameState.map?.nodes?.[0]?.id;
-
-  if (startNode) GameState.heroPos = startNode;
-  GameState.campDays = 3;
-}
-
-window.__spawnHero = (round = 1) => {
-  const bases = window.__BASE_HEROES || [];
-  if (!bases.length) {
-    console.warn("[spawnHero] Keine baseHeroes geladen!");
-    GameState.hero = createHero({ name: "Held", maxHp: 90, baseSpeed: 1 });
-    applyHeroNameAndAbility(GameState.hero);
-    placeHeroAtStart();
-    renderMap?.();
-    window.__render?.();
-    return;
-  }
-
-  const base = pickRandom(bases);
-
-  const factor = 1 + 0.15 * (round - 1);
-  const scaled = {
-    ...base,
-    maxHp: Math.round((base.maxHp || 1) * factor),
-  };
-
-  const hero = createHero(scaled);
-
-  // WICHTIG: HP sauber setzen
-  hero.maxHp = scaled.maxHp;
-  hero.hp    = scaled.maxHp;
-
-  applyHeroNameAndAbility(hero);
-  GameState.hero = hero;
-
-  placeHeroAtStart();
-  renderMap?.();
-  window.__render?.();
-};
-
-// Cheat: spawn with specific ability
-window.__spawnHeroWithAbilityId = (abilityId) => {
-  const round = GameState.round ?? 1;
-  window.__spawnHero(round);
-  applyHeroNameAndAbility(GameState.hero, abilityId);
-  window.__render?.();
-  renderMap?.();
-};
-
-// Backwards compatibility (falls dein Cheat-UI das so aufruft)
-window.__spawnHeroWithAbility = (abilityObj) => {
-  const id = abilityObj?.id || null;
-  window.__spawnHeroWithAbilityId(id);
-};
-// ------------------------------------------------------------
-// HERO SPAWN (ein Held, random Name + random Ability)
-// ------------------------------------------------------------
-
-
 function applyNameAndAbility(hero, forcedAbilityId = null) {
-  // Name: immer random aus heroes.de.json -> names
+  // Name: random
   const n = pickRandom(window.__HERO_NAMES);
   if (n) hero.name = n;
 
-  // Ability: random oder erzwungen
+  // Ability: random oder forced
   const abilities = window.__HERO_ABILITIES || [];
   let a = null;
 
-  if (forcedAbilityId) {
-    a = abilities.find(x => x.id === forcedAbilityId) || null;
-  } else {
-    a = pickRandom(abilities);
-  }
+  if (forcedAbilityId) a = abilities.find((x) => x.id === forcedAbilityId) || null;
+  else a = pickRandom(abilities);
 
   if (a) {
     hero.abilityId = a.id;
@@ -225,36 +130,53 @@ function applyNameAndAbility(hero, forcedAbilityId = null) {
     hero.abilityDesc = a.desc;
   } else {
     hero.abilityId = null;
-    hero.abilityName = null;
-    hero.abilityDesc = null;
+    hero.abilityName = "Keine";
+    hero.abilityDesc = "";
+  }
+
+  // colossus_blood: +20% MaxHP (nachdem ability gesetzt ist!)
+  if (hero.abilityId === "colossus_blood") {
+    const newMax = Math.max(1, Math.round(hero.maxHp * 1.2));
+    hero.maxHp = newMax;
+    hero.hp = newMax;
   }
 }
 
+function placeHeroAtStart() {
+  const startNode =
+    GameState.map?.nodes?.find((n) => n.layer === 0)?.id ??
+    GameState.map?.nodes?.[0]?.id;
+
+  if (startNode) GameState.heroPos = startNode;
+  GameState.campDays = 1;
+}
 
 window.__spawnHero = (round = 1, forcedAbilityId = null) => {
-  // Basis-HP (kannst du frei ändern)
   const BASE_HP = 90;
 
-  // Scaling wie vorher (15% pro Runde)
   const factor = 1 + 0.15 * (Math.max(1, round) - 1);
   const maxHp = Math.round(BASE_HP * factor);
 
-  // createHero soll nur ein Hero-Objekt bauen (Elemente etc. darf er machen)
   const hero = createHero({
     name: "Held",
     maxHp,
     baseSpeed: 1,
   });
 
-  // HP sicher setzen
   hero.maxHp = maxHp;
   hero.hp = maxHp;
   hero.level = round;
 
-  // Name + Ability setzen
-  applyNameAndAbility(hero, forcedAbilityId);
+  // 🔥 WICHTIG:
+  // Runde 1 -> KEINE Fähigkeit
+  if (round === 1) {
+    hero.abilityId = null;
+    hero.abilityName = null;
+    hero.abilityDesc = null;
+  } else {
+    applyNameAndAbility(hero, forcedAbilityId);
+  }
 
-  // Containers
   hero.items = Array.isArray(hero.items) ? hero.items : [];
   hero.effects = Array.isArray(hero.effects) ? hero.effects : [];
 
@@ -265,7 +187,7 @@ window.__spawnHero = (round = 1, forcedAbilityId = null) => {
   window.__render?.();
 };
 
-// Cheat: exakt diese Fähigkeit
+// Cheats: exakt diese Fähigkeit
 window.__spawnHeroWithAbilityId = (abilityId) => {
   const round = GameState.round ?? 1;
   window.__spawnHero(round, abilityId);
@@ -292,17 +214,20 @@ document.querySelector("#btn-demon").onclick = () => showShop(PASSIVE_CARDS);
 // Run start
 // ------------------------------------------------------------
 window.__startRun = (chosenTplIds) => {
-  GameState.round   = 1;
-  GameState.day     = 1;
-  GameState.maxDays = GameState.maxDays || 50;
-  GameState.energy  = 0;
-  GameState.souls   = 0;
+  GameState.round = 1;
+  GameState.day = 1;
 
-  GameState.hand    = [];
+  // Sieg nach x Tagen
+  GameState.maxDays = 12;
+
+  GameState.energy = 0;
+  GameState.souls = 0;
+
+  GameState.hand = [];
   GameState.discard = [];
-  GameState.placed  = new Map();
+  GameState.placed = new Map();
 
-  GameState.deck = shuffle(chosenTplIds.map(tplId => newInstance(tplId, 1)));
+  GameState.deck = shuffle(chosenTplIds.map((tplId) => newInstance(tplId, 1)));
 
   try { regenerateMap(1); } catch (e) { console.error("regenerateMap(1) fail", e); }
 
@@ -314,6 +239,7 @@ window.__startRun = (chosenTplIds) => {
 
   window.__log?.(`<b>Run start</b>: Tag ${GameState.day} • Hand=${GameState.hand.length} • Deck=${GameState.deck.length}`);
 };
+
 
 // ------------------------------------------------------------
 // Items (optional)
@@ -329,6 +255,7 @@ window.__giveHeroRandomItem = () => {
   const it = list[Math.floor(Math.random() * list.length)];
   h.items = Array.isArray(h.items) ? h.items : [];
   h.items.push(it.id);
+
   applyItemPassives(h);
 
   window.__log?.(`<span class="small k">🎒 Item</span>: Held erhält <b>${it.name}</b>.`);

@@ -1,13 +1,68 @@
 [
   {
+    "id": "angst",
+    "name": "Angst",
+    "stackable": false,
+    "maxStacks": 1,
+    "durationDays": 3,
+    "onApply": [{ "kind": "set_vuln_pct", "pct": 10 }],
+    "onExpire": [{ "kind": "set_vuln_pct", "pct": 0 }],
+    "desc": "Erhöht eingehenden Schaden um 10%."
+  },
+  {
+    "id": "siegessicher",
+    "name": "Siegessicher",
+    "stackable": false,
+    "maxStacks": 1,
+    "durationDays": 3,
+    "onApply": [{ "kind": "set_resist_pct", "pct": 10 }],
+    "onExpire": [{ "kind": "set_resist_pct", "pct": 0 }],
+    "desc": "Reduziert eingehenden Schaden um 10%."
+  },
+  {
     "id": "verstoert",
     "name": "Verstört",
     "stackable": true,
     "maxStacks": 99,
     "durationDays": null,
-    "onApply": [
-      { "kind": "reduce_maxhp_pct", "pct": 10 }
-    ],
+    "onApply": [{ "kind": "reduce_maxhp_pct", "pct": 10 }],
     "desc": "Senkt MaxHP um 10% (stapelbar)."
+  },
+  {
+    "id": "rache",
+    "name": "Rache",
+    "stackable": true,
+    "maxStacks": 99,
+    "durationDays": null,
+    "onApply": [{ "kind": "increase_maxhp_pct", "pct": 8 }],
+    "desc": "Erhöht MaxHP um 8% (stapelbar)."
+  },
+  {
+    "id": "betrunken",
+    "name": "Betrunken",
+    "stackable": true,
+    "maxStacks": 99,
+    "durationDays": 1,
+    "onApply": [{ "kind": "next_trap_mult", "mult": 2 }],
+    "desc": "Nächste Falle löst doppelt aus."
+  },
+  {
+    "id": "de_mann",
+    "name": "De Mann",
+    "stackable": false,
+    "maxStacks": 1,
+    "durationDays": 3,
+    "onApply": [{ "kind": "immune_random_elements", "count": 3 }],
+    "onExpire": [{ "kind": "clear_immune_elements" }],
+    "desc": "Immun gegen 3 zufällige Elemente."
+  },
+  {
+    "id": "gift",
+    "name": "Gift",
+    "stackable": true,
+    "maxStacks": 99,
+    "durationDays": 3,
+    "onApply": [{ "kind": "add_dot", "dmg": 2, "days": 3, "element": "natur" }],
+    "desc": "Fügt 3 Tage lang Giftschaden zu."
   }
 ]

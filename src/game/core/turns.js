@@ -72,7 +72,7 @@ export function endDay() {
   }
 
   if (GameState.round == null) GameState.round = 1;
-  if (GameState.campDays == null) GameState.campDays = 3;
+  if (GameState.campDays == null) GameState.campDays = 1;
 
   const h = GameState.hero;
   if (!h) return;
@@ -98,6 +98,40 @@ export function endDay() {
   // --- 1) Effekte 1 Tag ticken ---
   try { tickEffectsOneDay?.(); }
   catch (e) { console.error("[endDay] tickEffectsOneDay crash", e); }
+
+  // --- 1b) Delayed Blasts ticken + explodieren ---
+  try {
+    h.status = h.status || {};
+    h.status.delayed = Array.isArray(h.status.delayed) ? h.status.delayed : [];
+
+    const keepDelayed = [];
+    for (const d of h.status.delayed) {
+      d.daysLeft = Math.max(0, (d.daysLeft ?? 0) - 1);
+
+      if (d.daysLeft > 0) {
+        keepDelayed.push(d);
+        continue;
+      }
+
+      // explode now
+      const base = Math.max(0, Math.round(d.dmg ?? 0));
+      const elem = d.element ?? null;
+
+      // computeFinalDamage ist in cards.js, daher hier simpel: element factor nur hier?
+      // Besser: wir machen direkten Schaden ohne computeFinalDamage NICHT.
+      // => wir wenden element factor via elementalFactorFor an und berücksichtigen resist/vuln über applyDamage pipeline (hero.js)
+      const factor = elementalFactorFor(h, elem);
+      const raw = Math.max(0, Math.round(base * factor));
+
+      const dealt = applyDamage(h, raw, { type: "direct", element: elem, source: "delayed_blast", day: GameState.day });
+      window.__log?.(`<span class="small">💥 Verzögerte Explosion: ${raw === dealt ? dealt : `${raw}→${dealt}`} Schaden${elem ? ` (${elem})` : ""}</span>`);
+    }
+
+    h.status.delayed = keepDelayed;
+  } catch (e) {
+    console.error("[endDay] delayed blast crash", e);
+  }
+
 
   // --- 2) DoTs ticken (FIX: keine undefinierten Variablen mehr) ---
   let total = 0;
@@ -203,7 +237,7 @@ export function endDay() {
     if (typeof window.__spawnHero === "function") window.__spawnHero(GameState.round);
     else fallbackSpawnHero();
 
-    GameState.campDays = 3;
+    GameState.campDays = 1;
 
     beginDay();
     renderMap?.();
@@ -339,5 +373,5 @@ function fallbackSpawnHero() {
   };
 
   if (startNode) GameState.heroPos = startNode.id;
-  GameState.campDays = 3;
+  GameState.campDays = 1;
 }

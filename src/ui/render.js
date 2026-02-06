@@ -395,7 +395,7 @@ export function render() {
       <div class="cost">${c.type === "passiv" ? "" : `L${inst.level || 1}`}</div>
       <div class="badge">${c.type}</div>
       <div class="name">${c.name}</div>
-      <div class="desc small">${formatDescFromTemplate(c, 1)}</div>
+      <div class="desc small">${formatCardDesc(inst)}</div>
       ${
         preview
           ? `<div class="mini small muted">${preview}</div>`
@@ -1130,19 +1130,52 @@ function shuffleInPlace(a) {
 
 function formatCardDesc(inst) {
   const v = instView(inst);
-  const tpl = v; // instView liefert schon template + level
+  const e = v.effect || {};
+  const kind = e.kind;
 
+  // skaliertes "Haupt"-Value (dmg/dot/pct/etc.)
   const val = Math.max(1, Math.floor(scaledValue(inst)));
 
-  // Default: original desc wenn kein Platzhalter drin
-  let desc = tpl.desc || "";
+  // Token-Map: alles was im Text vorkommen könnte
+  const tokens = {
+    value: val,
+    val: val,
+    dmg: val,
+    dot: val,
+    pct: val,
 
-  // Unterstütze {value}
-  desc = desc.replaceAll("{value}", String(val));
+    days: e.days ?? "",
+    hits: e.hits ?? "",
+    delay: e.delayDays ?? "",
+    element: e.element ?? "",
+    threshold: e.threshold != null ? Math.round(e.threshold * 100) : "",
+    souls: ""
+  };
 
-  // Optional: falls du später mehr willst
-  // desc = desc.replaceAll("{level}", String(inst.level || 1));
+  // Sonderfälle pro Effekt
+  if (kind === "damage_plus_souls") {
+    const soulsBase = Math.max(0, Math.round(e.soulsBase ?? 0));
+    const soulsGrowth = Math.max(0, Number(e.soulsGrowth ?? 0));
+    const lvl = inst.level || 1;
+    const souls = Math.max(0, Math.round(soulsBase + (lvl - 1) * soulsGrowth));
+    tokens.souls = souls;
+  }
+
+  if (kind === "kill_bonus_souls") {
+    // bei dir ist effect.base die souls-zahl
+    tokens.souls = Math.max(0, Math.round(e.base ?? val));
+  }
+
+  // Default: original desc wenn leer
+  let desc = v.desc || "";
+
+  // Alle {xyz} ersetzen:
+  desc = desc.replace(/\{(\w+)\}/g, (_, key) => {
+    if (tokens[key] == null) return `{${key}}`;
+    return String(tokens[key]);
+  });
 
   return desc;
 }
+
 
